@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>WebGraphics gallery</title>
+	<wolfram:slot id="style" />
+	<wolfram:slot id="lib3d" />
+</head>
+
+<body>
+	<h1>ToneAr/WebGraphics Gallery</h1>
+	<p class="sub">Example playground for WolframWebGraphics</p>
+	<div class="grid">
+		<wolfram:sequence values="#examples">
+			<div class="card">
+				<h2><wolfram:slot id="1" /></h2>
+				<p><wolfram:slot id="2" /></p>
+				<wolfram:expr>
+					serialize[#3]
+				</wolfram:expr>
+			</div>
+		</wolfram:sequence>
+	</div>
+</body>
+
+</html>
+

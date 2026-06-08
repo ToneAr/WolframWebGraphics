@@ -1,3 +1,2 @@
-# personal-project-WOLFRAM-WEB-PLOT
-
-Export Wolfram Language Plots and Graphics to a web friendly format
+# Wolfram Web Graphics
+Export Wolfram Language Plots and Graphics to a web friendly format.

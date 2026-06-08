@@ -1,0 +1,4 @@
+**/rendered-demo/**
+build
+demo-gallery.html
+*.dev.*
