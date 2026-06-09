@@ -20,6 +20,15 @@ insetPositionPx[_] := Missing[];
 insetTargetSize[Automatic, wh_] := wh;
 insetTargetSize[{w_?NumericQ, h_?NumericQ}, _] := {sclX[]  w, sclY[]  h};
 insetTargetSize[s_?NumericQ, _] := {sclX[]  s, sclY[]  s};
+insetTargetSize[Offset[{dx_?NumericQ, dy_?NumericQ}], _] :=
+	(*
+	 * Offset[..] size is an absolute extent in printer's points (independent of
+	 * the plot scale) -- used by GeoMarker pins.  A scalar fits the graphic into a
+	 * box of that many points preserving its aspect ratio; a pair sets each axis.
+	 *)
+	{ptToUser[dx], ptToUser[dy]};
+insetTargetSize[Offset[s_?NumericQ], wh_] :=
+	With[{m = Max[wh]}, If[m <= 0, wh, wh * (ptToUser[s] / m)]];
 insetTargetSize[_, wh_] := wh;
 
 insetHorizontal[Left] = 0;

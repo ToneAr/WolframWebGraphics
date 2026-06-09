@@ -52,7 +52,9 @@ endpointFrac[Center] = {0.5, 0.5};
 endpointFrac[{a_?NumericQ, b_?NumericQ}] := {a, b};
 endpointFrac[_] := {0.5, 0.5};
 
-(* objectBoundingBox endpoints (0..1), y flipped for SVG *)
+(*
+ * ObjectBoundingBox endpoints (0..1), y flipped for SVG
+ *)
 linearEndpoints[{p1_, p2_}] := {endpointFrac[p1], endpointFrac[p2]};
 linearEndpoints[theta_?NumericQ] :=
 	{

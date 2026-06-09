@@ -1,3 +1,5 @@
+PackageImport @ "XML`";
+
 PackageScoped[
 	{
 		statusNode,
@@ -21,17 +23,23 @@ $wgxNeedsRuntime = False;
 $wgxCurve = False;
 
 (*
- * script/style go in CDATA so quotes, <, >, && survive verbatim
- * ExportString would otherwise entity-escape them and break inline-HTML
- * contexts
+ * script/style content escapes only the three XML-significant characters
+ * (`&`, `<`, `>`); quotes and everything else stay literal so the JS/CSS reads
+ * normally and stays compact.  This keeps the document well-formed XML -- an
+ * XML/SVG parser un-escapes the text before the JS engine sees it -- without
+ * the over-escaping (`&quot;` everywhere) that a plain string child would get,
+ * and without a CDATA section.  `&` is replaced first to avoid double-escaping.
  *)
+xmlTextEscape[s_String] :=
+	StringReplace[s, {"&" -> "&amp;", "<" -> "&lt;", ">" -> "&gt;"}];
+
 runtimeNodes[props_] :=
 	{
-		XMLElement["style", {}, {XMLObject["CDATASection"][$wgxStyle]}],
+		XMLElement["style", {}, {XML`RawXML[xmlTextEscape[$wgxStyle]]}],
 		XMLElement[
 			"script",
 			{},
-			{XMLObject["CDATASection"][wgxSvgRuntimeScript[]]}
+			{XML`RawXML[xmlTextEscape[wgxSvgRuntimeScript[]]]}
 		],
 		statusNode[Lookup[props, "viewBox", Missing[]]]
 	};

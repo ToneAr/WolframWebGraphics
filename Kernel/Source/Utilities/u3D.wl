@@ -1,3 +1,4 @@
+(* wl-disable-file DocCommentInputMismatch *)
 PackageScoped[
 	{
 		$wgxInline3DLib,
@@ -15,14 +16,15 @@ PackageScoped[
 		viewPoint3D,
 		wgx3DWidgetScript,
 		scriptSafe,
-		wgx3DLibraryTag
+		wgx3DLibraryTag,
+		wgx3DWidgetLibraryTag
 	}
 ]
 (*
  * 2D Graphics stays on the SVG backend (Serialize.wl); 3D goes through here:
  * extract meshes from the GraphicsComplex the kernel produces, emit a <div>
  * hosting a Three.js scene with OrbitControls (drag-rotate / zoom / pan).
- * The Three.js + the OrbitControls and runtime source are inlined (CDATA) so
+ * The Three.js + the OrbitControls and runtime source are inlined so
  * the output is self-contained.
  *)
 (* ---- inlined library/runtime (read from Resources/, memoised) ---------- *)
@@ -63,15 +65,20 @@ heightColors[verts_] :=
 		t = If[mx <= mn, ConstantArray[0.5, Length[z]], (z - mn) / (mx - mn)];
 		Map[colorRGB3D[Blend[$heightPalette, #]]&, t]
 	];
+heightColors[{}] := {};
 
 meshFromGC[gc_] :=
 	Module[{
 			verts = gc[[1]],
 			norms = First[Cases[gc, (VertexNormals -> v_) :> v, Infinity], None],
 			vcol = First[Cases[gc, (VertexColors -> v_) :> v, Infinity], None],
+			uv =
+				First[Cases[gc, (VertexTextureCoordinates -> v_) :> v, Infinity], None],
+			tex = First[Cases[gc[[2]], Texture[img_Image] :> img, Infinity], None],
 			faces,
 			tris,
-			cols
+			cols,
+			hasTexture
 		},
 		faces = Join @@ Cases[gc[[2]], Polygon[f_] :> f, Infinity];
 		tris = Join @@ (fan3D /@ faces);
@@ -80,47 +87,88 @@ meshFromGC[gc_] :=
 				heightColors[verts],
 				colorRGB3D /@ vcol
 			];
+		hasTexture =
+			tex =!= None &&
+			MatchQ[uv, {{_?NumericQ, _?NumericQ}..}] &&
+			Length[uv] === Length[verts];
 		<|
-			"pos" -> roundFlat3D[verts],
+			"pos"  -> roundFlat3D[verts],
 			"norm" -> If[norms === None, Null, roundFlat3D[norms]],
-			"col" -> roundFlat3D[cols],
-			"idx" -> Flatten[tris - 1]
+			"col"  -> If[hasTexture, Null, roundFlat3D[cols]],
+			"uv"   -> If[hasTexture, roundFlat3D[uv], Null],
+			"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+			"idx"  -> Flatten[tris - 1]
 		|>
 	];
 
+trianglesFromPolygon3D[poly_Polygon] :=
+	Cases[
+		Quiet @ Check[PolygonDecomposition[poly, "Triangle"], {}],
+		Polygon[p : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, ___] /;
+			Length[p] == 3 :> p,
+		Infinity
+	];
+
+literalPolygonTriangles[
+	Polygon[pts : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, ___]
+] :=
+	If[Length[pts] >= 3, fan3D[pts], {}];
+literalPolygonTriangles[_] := {};
+
+literalPolygonUVTriangles[
+	Polygon[pts : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, opts___]
+] :=
+	Module[{
+			uv = Lookup[Association[{opts}], VertexTextureCoordinates, None]
+		},
+		If[
+			MatchQ[uv, {{_?NumericQ, _?NumericQ}..}] &&
+			Length[uv] === Length[pts] &&
+			Length[uv] >= 3,
+			fan3D[uv],
+			{}
+		]
+	];
+literalPolygonUVTriangles[_] := {};
+
 (* Explicit Polygon[{p1,p2,p3,..}] with inline coords (no GraphicsComplex) *)
-meshFromPolygons[polys_] :=
-	Module[{verts, tris = {}, k = 0},
-		verts = Join @@ (List @@@ polys);
-		Do[
-			With[{n = Length[polys[[i]][[1]]]},
-				tris = Join[tris, fan3D[Range[k + 1, k + n]]];
-				k += n
-			],
-			{i, Length[polys]}
-		];
+meshFromPolygons[polys : {__Polygon}, tex_ : None] :=
+	Module[{tris, verts, uvTris, uv, hasTexture},
+		tris =
+			If[tex === None,
+				Join @@ (trianglesFromPolygon3D /@ polys),
+				Join @@ (literalPolygonTriangles /@ polys)
+			];
+		verts = If[tris === {}, {}, Join @@ tris];
+		uvTris = If[tex === None, {}, Join @@ (literalPolygonUVTriangles /@ polys)];
+		uv = If[uvTris === {}, {}, Join @@ uvTris];
+		hasTexture = tex =!= None && Length[uv] === Length[verts];
 		<|
-			"pos" -> roundFlat3D[verts],
+			"pos"  -> roundFlat3D[verts],
 			"norm" -> Null,
-			"col" -> roundFlat3D[heightColors[verts]],
-			"idx" -> Flatten[tris - 1]
+			"col"  -> If[hasTexture, Null, roundFlat3D[heightColors[verts]]],
+			"uv"   -> If[hasTexture, roundFlat3D[uv], Null],
+			"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+			"idx"  -> Range[0, Length[verts] - 1]
 		|>
 	];
 
 graphics3DMeshes[g_] :=
 	Module[{
 			gcs = Cases[g, _GraphicsComplex, Infinity],
-			polys
+			polys,
+			tex
 		},
 		If[gcs =!= {},
 			meshFromGC /@ gcs,
 			polys =
 				Cases[
 					g,
-					Polygon[p : {{_?NumericQ, _?NumericQ, _?NumericQ}..}],
+					Polygon[p : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, ___],
 					Infinity
 				];
-			If[polys =!= {}, {meshFromPolygons[polys]}, {}]
+			tex = First[Cases[g, Texture[img_Image] :> img, Infinity], None];
+			If[polys =!= {}, {meshFromPolygons[polys, tex]}, {}]
 		]
 	];
 
@@ -132,7 +180,7 @@ allVertices3D[g_] :=
 			Join @@ (First /@ gcs),
 			Join @@ Cases[
 				g,
-				Polygon[p : {{_?NumericQ, _?NumericQ, _?NumericQ}..}] :> p,
+				Polygon[p : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, ___] :> p,
 				Infinity
 			]
 		]
@@ -175,3 +223,10 @@ scriptSafe[js_] :=
 
 wgx3DLibraryTag[] :=
 	StringJoin[ "<script>", scriptSafe[wgx3DLibrary[]], "</script>"];
+
+wgx3DWidgetLibraryTag[elementID_, sceneConfigJson_] :=
+	StringJoin[
+		"<script>",
+		scriptSafe[wgx3DWidgetScript[elementID, sceneConfigJson]],
+		"</script>"
+	];

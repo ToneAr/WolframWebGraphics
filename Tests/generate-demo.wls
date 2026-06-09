@@ -455,7 +455,7 @@ examples =
 				Sin[x]  Exp[-x / 8],
 				{x, 0, 6  Pi},
 				PlotLabel -> Style["Damped sine", 14, Bold],
-				AxesLabel -> {"x", "sin(x) exp(-x/8)"},
+				AxesLabel -> {x, Sin[x] * Exp[-x / 8]},
 				ImageSize -> 380
 			]
 		},
@@ -488,7 +488,7 @@ examples =
 			"Labeled title wrapper",
 			"A Labeled plot keeps the outer title wrapper in the export.",
 			Labeled[
-				Plot[Sin[x ^ 2], {x, 0, 4}, AxesLabel -> {"x", "sin(x^2)"}],
+				Plot[Sin[x ^ 2], {x, 0, 4}, AxesLabel -> {x, Sin[x ^ 2]}],
 				"External title",
 				Top
 			]

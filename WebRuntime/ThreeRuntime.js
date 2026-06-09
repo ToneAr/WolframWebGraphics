@@ -136,6 +136,13 @@
 			);
 		}
 
+		if (meshConfig.uv) {
+			geometry.setAttribute(
+				"uv",
+				new threeNamespace.Float32BufferAttribute(meshConfig.uv, 2),
+			);
+		}
+
 		geometry.setIndex(meshConfig.idx);
 
 		if (!meshConfig.norm) {
@@ -146,14 +153,20 @@
 	}
 
 	function createMeshMaterial(threeNamespace, meshConfig) {
+		var texture = meshConfig.tex
+			? new threeNamespace.TextureLoader().load(meshConfig.tex)
+			: null;
 		var material = new threeNamespace.MeshPhongMaterial({
-			vertexColors: Boolean(meshConfig.col),
+			map: texture,
+			vertexColors: Boolean(meshConfig.col) && !texture,
 			side: threeNamespace.DoubleSide,
 			flatShading: false,
 			shininess: 25,
 		});
 
-		if (!meshConfig.col) {
+		if (texture) {
+			material.color = new threeNamespace.Color(1, 1, 1);
+		} else if (!meshConfig.col) {
 			material.color = new threeNamespace.Color(0.36, 0.5, 0.7);
 		}
 

@@ -15,16 +15,24 @@ PackageScoped[
 		labelApproxSize,
 		textExtract,
 		textContent,
-		rasterSvg
+		rasterSvg,
+		textAlignOffset
 	}
 ]
+
+$lightDark // PackageScoped;
+$lightDark =
+	Replace[
+		Quiet @ AbsoluteCurrentValue[LightDark],
+		Automatic | "System" -> "Light"
+	];
 
 svgString[el_] := ExportString[el, "XML"];
 
 (*
- * the <svg> element on its own (reused for nested graphics: Inset, Tooltip
- * labels). Saves/restores the global coordinate scale so a nested graphic
- * cannot corrupt the enclosing one.
+ * The <svg> element on its own.
+ * Saves/restores the global coordinate scale so a nested graphic cannot
+ * corrupt the enclosing one.
  *)
 svgElement[Graphics[prim_, opts : OptionsPattern[Graphics]]] :=
 	svgElement[Graphics[{prim}, opts]] /; Head[prim] =!= List;
@@ -112,6 +120,13 @@ hrefStr[URL[u_]] := u;
 hrefStr[u_String] := u;
 hrefStr[u_] := ToString[u];
 
+textAlignOffset[Left] = -1;
+textAlignOffset[Bottom] = -1;
+textAlignOffset[Right] = 1;
+textAlignOffset[Top] = 1;
+textAlignOffset[Center] = 0;
+
+
 textSvg[expr_, {x_?NumericQ, y_?NumericQ}, {ox_, oy_}, props_] :=
 	textSvgPx[expr, {mapX[x], mapY[y]}, {ox, oy}, props];
 
@@ -182,6 +197,53 @@ labelSvgNode[expr_String, {x_, y_}, anchor_, baseline_, textProps_, attrs_] :=
 		],
 		{expr}
 	];
+labelSvgNode[
+	Panel[inner_, opts___],
+	pos : {_?NumericQ, _?NumericQ},
+	anchor_,
+	baseline_,
+	textProps_,
+	attrs_
+] :=
+	Module[{o, pad, content, size, w, h, x0, y0},
+		o = Association[Cases[{opts}, _Rule | _RuleDelayed]];
+		pad = panelPadding[Lookup[o, FrameMargins, Automatic]];
+		content = First[textExtract[inner]];
+		size = labelApproxSize[content, textProps];
+		w = size[[1]] + pad[[1]] + pad[[2]];
+		h = size[[2]] + pad[[3]] + pad[[4]];
+		x0 = pos[[1]] + anchorOffset[anchor, w];
+		y0 = pos[[2]] + baselineOffset[baseline, h];
+		XMLElement[
+			"g",
+			attrs,
+			{
+				XMLElement[
+					"rect",
+					Join[
+						{
+							"x"      -> makeSvgNumber[x0],
+							"y"      -> makeSvgNumber[y0],
+							"width"  -> makeSvgNumber[w],
+							"height" -> makeSvgNumber[h],
+							"rx"     -> makeSvgNumber[panelRadius[o]]
+						},
+						panelBackgroundAttrs[Lookup[o, Background, Automatic]],
+						panelFrameAttrs[Lookup[o, FrameStyle, Automatic]]
+					],
+					{}
+				],
+				labelSvgNode[
+					content,
+					{x0 + w / 2, y0 + h / 2},
+					"middle",
+					"middle",
+					textProps,
+					{}
+				]
+			}
+		]
+	];
 labelSvgNode[expr_, {x_, y_}, anchor_, baseline_, textProps_, attrs_] :=
 	Module[{text, math, box, dx, dy},
 		text = labelTextString[expr];
@@ -231,11 +293,27 @@ labelSvgNode[expr_, {x_, y_}, anchor_, baseline_, textProps_, attrs_] :=
 	];
 
 SetAttributes[labelTextString, HoldFirst];
+labelTextString[s_String] := s;
+labelTextString[e_System`Entity] := entityLabelText[e];
+labelTextString[Panel[inner_, ___]] := labelTextString[inner];
+labelTextString[Style[inner_, ___]] := labelTextString[inner];
+labelTextString[Pane[inner_, ___]] := labelTextString[inner];
+labelTextString[Framed[inner_, ___]] := labelTextString[inner];
+labelTextString[Row[items_List]] := StringJoin[ textContent /@ items];
+labelTextString[Row[items_List, sep_]] :=
+	StringRiffle[textContent /@ items, textContent[sep]];
+labelTextString[Column[items_List, ___]] :=
+	StringRiffle[textContent /@ items, " "];
 labelTextString[HoldForm[s_String]] := s;
 labelTextString[HoldForm[s_Symbol]] := heldSymbolText[s];
 labelTextString[FormBox[s_String, ___]] := s;
 labelTextString[FormBox[HoldForm[s_String], ___]] := s;
 labelTextString[FormBox[HoldForm[s_Symbol], ___]] := heldSymbolText[s];
+(* A bare Integer/Real is a plain glyph in WL (e.g. a bar value label from
+   LabelingFunction -> Above), so render it as <text>, matching textContent's
+   ToString fallback.  Rationals (1/2) and symbolic exprs (Pi, x^2) deliberately
+   fall through to the MathML typeset path below. *)
+labelTextString[n : (_Integer | _Real)] := ToString[n];
 labelTextString[_] := Missing["NotText"];
 
 SetAttributes[heldSymbolText, HoldFirst];
@@ -273,6 +351,32 @@ anchorOffset[_, w_] := -w / 2;
 baselineOffset["hanging", _] := 0;
 baselineOffset["text-after-edge", h_] := -h;
 baselineOffset[_, h_] := -h / 2;
+
+panelMarginValue[Automatic] := ptToUser[4];
+panelMarginValue[n_?NumericQ] := ptToUser[n];
+panelMarginValue[_] := ptToUser[4];
+
+panelPadding[{{l_, r_}, {b_, t_}}] := panelMarginValue /@ {l, r, t, b};
+panelPadding[{h_, v_}] := panelMarginValue /@ {h, h, v, v};
+panelPadding[n_?NumericQ] := ConstantArray[panelMarginValue[n], 4];
+panelPadding[_] := ConstantArray[panelMarginValue[Automatic], 4];
+
+panelRadius[o_] := panelMarginValue[Lookup[o, RoundingRadius, 3]];
+
+panelBackgroundAttrs[None] := {"fill" -> "none"};
+panelBackgroundAttrs[bg_?colorSpecQ] :=
+	Module[{c = colorToSvg[bg]},
+		If[c["alpha"] < 1,
+			{"fill" -> c["rgb"], "fill-opacity" -> makeSvgNumber[c["alpha"]]},
+			{"fill" -> c["rgb"]}
+		]
+	];
+panelBackgroundAttrs[_] := {"fill" -> "#f8fafc"};
+
+panelFrameAttrs[None] := {"stroke" -> "none"};
+panelFrameAttrs[style_?colorSpecQ] :=
+	With[{c = colorToSvg[style]}, {"stroke" -> c["rgb"], "stroke-width" -> "1"}];
+panelFrameAttrs[_] := {"stroke" -> "#cbd5e1", "stroke-width" -> "1"};
 
 mathDivStyle[textProps_, anchor_, baseline_] :=
 	Module[{props = Association[textProps]},
@@ -334,13 +438,42 @@ mathFontCss[props_] :=
 	];
 
 mathMLElement[expr_] :=
-	Module[{xml},
-		xml = Check[ImportString[ExportString[expr, "MathML"], "XML"], $Failed];
-		Replace[
-			xml,
-			XMLObject["Document"][_, el_XMLElement, _] :> sanitizeMathMLElement[el]
+	Module[{mathString, xml},
+		mathString =
+			Quiet[
+				ExportString[expr, "MathML"],
+				{
+					Export::xmlmal,
+					XML`MathML`BoxesToSymbolicMathML::uncnvbxs,
+					XML`MathML`BoxesToSymbolicMathML::notboxes
+				}
+			];
+		If[StringQ[mathString],
+			xml = ImportString[mathString, "XML"];
+			Replace[
+				xml,
+				XMLObject["Document"][_, el_XMLElement, _] :> sanitizeMathMLElement[el]
+			],
+			$Failed
 		]
 	];
+mathMLElement[Style[inner_, ___]] := mathMLElement[inner];
+mathMLElement[Pane[inner_, ___]] := mathMLElement[inner];
+mathMLElement[Framed[inner_, ___]] := mathMLElement[inner];
+
+entityLabelText[e_System`Entity] :=
+	Module[{label},
+		label =
+			FirstCase[
+				ToBoxes[e, StandardForm],
+				TemplateBox[{s_String, ___}, ___] :> entityBoxString[s],
+				Missing["NotFound"],
+				{0, Infinity}
+			];
+		If[StringQ[label], label, ToString[e, InputForm]]
+	];
+
+entityBoxString[s_String] := StringReplace[StringTrim[s, "\""], "\\\"" -> "\""];
 
 mathGlyphReplacementRules[] :=
 	Join[
@@ -394,6 +527,16 @@ textExtract[Style[inner_, specs___]] :=
 textExtract[e_] := {e, {}};
 
 textContent[s_String] := s;
+textContent[e_System`Entity] := entityLabelText[e];
+textContent[Panel[inner_, ___]] := textContent[inner];
+textContent[Style[inner_, ___]] := textContent[inner];
+textContent[Pane[inner_, ___]] := textContent[inner];
+textContent[Framed[inner_, ___]] := textContent[inner];
+textContent[Row[items_List]] := StringJoin[ textContent /@ items];
+textContent[Row[items_List, sep_]] :=
+	StringRiffle[textContent /@ items, textContent[sep]];
+textContent[Column[items_List, ___]] := StringRiffle[textContent /@ items, " "];
+textContent[Spacer[___]] := " ";
 textContent[e_] := ToString[e];
 
 rasterSvg[data_, {{x1_, y1_}, {x2_, y2_}}, props_] :=

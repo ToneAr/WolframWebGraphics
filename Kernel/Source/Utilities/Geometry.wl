@@ -32,6 +32,12 @@ PackageScoped[
 		plotDecorationNodes,
 		roundingAttr,
 		bezierPath,
+		bSplinePath,
+		joinedCurvePath,
+		filledCurvePath,
+		codedJoinedCurvePath,
+		codedFilledCurvePath,
+		pixelOpenPath,
 		ellipseGeom,
 		ellipseTag,
 		curveClass
@@ -141,15 +147,10 @@ arrowHead[pts_, size_, pos_, col_] :=
 		]
 	];
 
-(* ========================================================================== *)
-(*  Axes / ticks / labels (generated from Graphics options;                   *)
-(*  WL stores these in options, not as primitives in g[[1]])                  *)
-(* ========================================================================== *)
 labelMissingQ[x_] :=
 	MatchQ[
 		x,
-		None | Automatic | Missing[___] | Spacer[___] | {} | {None..} |
-			{{None..}..}
+		None | Automatic | Missing[___] | Spacer[___] | {} | {None..} | {{None..}..}
 	];
 
 plotOptionAssociation[g_] := Association[Options[g]];
@@ -177,8 +178,30 @@ replaceGraphicsOptions[opts_List, repl_Association] :=
 
 resolvedPlotDecorationOptions[g_] :=
 	KeySelect[
-		resolveAbsoluteGraphicsOptions[g, {PlotRange, Ticks, FrameTicks}],
-		MemberQ[{PlotRange, Ticks, FrameTicks}, #]&
+		resolveAbsoluteGraphicsOptions[
+			g,
+			{
+				PlotRange,
+				PlotRangePadding,
+				ImagePadding,
+				ImageSize,
+				AspectRatio,
+				Ticks,
+				FrameTicks
+			}
+		],
+		MemberQ[
+			{
+				PlotRange,
+				PlotRangePadding,
+				ImagePadding,
+				ImageSize,
+				AspectRatio,
+				Ticks,
+				FrameTicks
+			},
+			#
+		]&
 	];
 
 resolveGraphics[g : Graphics[prim_, opts___]] :=
@@ -198,6 +221,12 @@ resolveGraphics[g : Graphics[prim_, opts___]] :=
 			],
 			repl[PlotRange] = Lookup[abs, PlotRange, Lookup[o, PlotRange]]
 		];
+		If[KeyExistsQ[abs, PlotRangePadding],
+			repl[PlotRangePadding] = abs[PlotRangePadding]
+		];
+		If[KeyExistsQ[abs, ImagePadding], repl[ImagePadding] = abs[ImagePadding]];
+		If[KeyExistsQ[abs, ImageSize], repl[ImageSize] = abs[ImageSize]];
+		If[KeyExistsQ[abs, AspectRatio], repl[AspectRatio] = abs[AspectRatio]];
 		If[KeyExistsQ[abs, Ticks], repl[Ticks] = abs[Ticks]];
 		If[KeyExistsQ[abs, FrameTicks], repl[FrameTicks] = abs[FrameTicks]];
 		If[repl === <||>,
@@ -248,10 +277,8 @@ normalizeTickFunction[func_, {lo_, hi_}, n_] :=
 
 normalizeTickList[spec_List] := DeleteCases[normalizeTick /@ spec, Null];
 
-normalizeTick[p_?NumericQ] :=
-	{p, tickStr[p], defaultTickLength[], {}};
-normalizeTick[{p_?NumericQ, label_}] :=
-	{p, label, defaultTickLength[], {}};
+normalizeTick[p_?NumericQ] := {p, tickStr[p], defaultTickLength[], {}};
+normalizeTick[{p_?NumericQ, label_}] := {p, label, defaultTickLength[], {}};
 normalizeTick[{p_?NumericQ, label_, len_}] :=
 	{p, label, tickLengthPair[len], {}};
 normalizeTick[{p_?NumericQ, label_, len_, style_}] :=
@@ -259,17 +286,22 @@ normalizeTick[{p_?NumericQ, label_, len_, style_}] :=
 normalizeTick[_] := Null;
 
 defaultTickLength[] := {0.012, 0.};
+
 tickLengthPair[{p_?NumericQ, m_?NumericQ}] := {p, m};
 tickLengthPair[len_?NumericQ] := {len, 0.};
 tickLengthPair[_] := defaultTickLength[];
 
 tickTupleQ[x_] := MatchQ[x, {_?NumericQ, ___}];
+
 tickSpecPairQ[x_] := ListQ[x] && Length[x] === 2 && !tickTupleQ[x];
+
 tickLabelMissingQ[label_] := label === "" || labelMissingQ[label];
 
 styleRuleQ[_Rule | _RuleDelayed] := True;
 styleRuleQ[_] := False;
+
 styleRuleListQ[x_List] := AllTrue[x, styleRuleQ];
+
 stylePairSpecQ[x_List] :=
 	Length[x] === 2 && !styleRuleListQ[x] && Head[x] =!= Directive;
 stylePairSpecQ[_] := False;
@@ -308,7 +340,8 @@ frameSideStyle[spec_, side_] :=
 
 axisTickSpec[spec_, i_] := If[tickSpecPairQ[spec], spec[[i]], spec];
 
-frameTicksNormalize[Automatic] = {{Automatic, Automatic}, {Automatic, Automatic}};
+frameTicksNormalize[Automatic] =
+	{{Automatic, Automatic}, {Automatic, Automatic}};
 frameTicksNormalize[None] = {{None, None}, {None, None}};
 frameTicksNormalize[spec_?frameTicksNestedQ] := spec;
 frameTicksNormalize[spec_?tickSpecPairQ] :=
@@ -318,23 +351,30 @@ frameTicksNormalize[spec_] := {{spec, spec}, {spec, spec}};
 frameTicksNestedQ[spec_] :=
 	ListQ[spec] && Length[spec] === 2 && AllTrue[spec, tickSpecPairQ];
 
-tickSideVector["Bottom"] = {0, -1};
-tickSideVector["Top"] = {0, 1};
-tickSideVector["Left"] = {-1, 0};
-tickSideVector["Right"] = {1, 0};
+tickInsideVector["Bottom"] = {0, 1};
+tickInsideVector["Top"] = {0, -1};
+tickInsideVector["Left"] = {1, 0};
+tickInsideVector["Right"] = {-1, 0};
+
+tickOutsideVector["Bottom"] = {0, -1};
+tickOutsideVector["Top"] = {0, 1};
+tickOutsideVector["Left"] = {-1, 0};
+tickOutsideVector["Right"] = {1, 0};
 
 tickLabelAnchor["Bottom"] = {0, 1};
 tickLabelAnchor["Top"] = {0, -1};
 tickLabelAnchor["Left"] = {1, 0};
 tickLabelAnchor["Right"] = {-1, 0};
 
-tickOffset[side_, len_] := tickSideVector[side]  fracToUser[len];
+tickInsideOffset[side_, len_] := tickInsideVector[side]  fracToUser[len];
+
+tickOutsideOffset[side_, len_] := tickOutsideVector[side]  fracToUser[len];
 
 tickLinePrimitive[base_, side_, {pos_, neg_}] :=
 	Line[
 		{
-			Offset[-tickOffset[side, neg], base],
-			Offset[tickOffset[side, pos], base]
+			Offset[-tickInsideOffset[side, neg], base],
+			Offset[tickInsideOffset[side, pos], base]
 		}
 	];
 
@@ -342,7 +382,7 @@ tickLabelPrimitive[label_, base_, side_, lens_] :=
 	Text[
 		label,
 		Offset[
-			tickOffset[side, Max[Abs /@ lens]] + 7  tickSideVector[side],
+			tickOutsideOffset[side, Max[Abs /@ lens]] + 7  tickOutsideVector[side],
 			base
 		],
 		tickLabelAnchor[side]
@@ -352,7 +392,10 @@ decorationBag[styles___] :=
 	Module[{bag = Internal`Bag[]},
 		Scan[
 			Internal`StuffBag[bag, #]&,
-			Join[{GrayLevel[0], AbsoluteThickness[0.8]}, styleSpecList /@ {styles}]
+			Join[
+				{$defaultTextAndAxesColor, AbsoluteThickness[0.8]},
+				styleSpecList /@ {styles}
+			]
 		];
 		bag
 	];
@@ -360,15 +403,12 @@ decorationBag[styles___] :=
 decorationNode[prim_, styles___] := serialize[prim, decorationBag[styles]];
 
 skipAxisTickLabelQ[_, None] := False;
-skipAxisTickLabelQ[pos_, ref_?NumericQ] := Abs[N[pos - ref]] < 10^-10;
+skipAxisTickLabelQ[pos_, ref_?NumericQ] := Abs[N[pos - ref]] < 10 ^ -10;
 
 tickNodes[ticks_, baseFn_, side_, styles_, skipLabelAt_ : None] :=
 	Flatten[
 		Table[
-			With[{
-					base = baseFn[tick[[1]]],
-					local = tick[[4]]
-				},
+			With[{base = baseFn[tick[[1]]], local = tick[[4]]},
 				DeleteCases[
 					{
 						decorationNode[
@@ -448,10 +488,7 @@ axisPrimitives[g_, {{x1_, x2_}, {y1_, y2_}}, axes_, {ox_, oy_}] :=
 						axisTickList[axisTickSpec[ticks, 1], {x1, x2}, 8],
 						({#, oy}&),
 						"Bottom",
-						{
-							axisSideStyle[axisStyle, 1],
-							axisSideStyle[tickStyle, 1]
-						},
+						{axisSideStyle[axisStyle, 1], axisSideStyle[tickStyle, 1]},
 						ox
 					]
 				],
@@ -469,10 +506,7 @@ axisPrimitives[g_, {{x1_, x2_}, {y1_, y2_}}, axes_, {ox_, oy_}] :=
 						axisTickList[axisTickSpec[ticks, 2], {y1, y2}, 5],
 						({ox, #}&),
 						"Left",
-						{
-							axisSideStyle[axisStyle, 2],
-							axisSideStyle[tickStyle, 2]
-						},
+						{axisSideStyle[axisStyle, 2], axisSideStyle[tickStyle, 2]},
 						oy
 					]
 				],
@@ -493,10 +527,7 @@ frameNodes[g_] :=
 		If[pr === $Failed,
 			{},
 			frame = frameNormalize[Lookup[plotOptionAssociation[g], Frame, False]];
-			If[!TrueQ[Or @@ Flatten[frame]],
-				{},
-				framePrimitives[g, pr, frame]
-			]
+			If[!TrueQ[Or @@ Flatten[frame]], {}, framePrimitives[g, pr, frame]]
 		]
 	];
 
@@ -510,8 +541,7 @@ frameLinePrimitive[{{x1_, x2_}, {y1_, y2_}}, "Right"] :=
 	Line[{{x2, y1}, {x2, y2}}];
 
 frameSideTicks[ticks_, {{x1_, x2_}, {y1_, y2_}}, side_] :=
-	Switch[
-		side,
+	Switch[side,
 		"Bottom" | "Top",
 			axisTickList[ticks, {x1, x2}, 8],
 		"Left" | "Right",
@@ -534,7 +564,13 @@ frameSideTickSpec[ticks_, "Bottom"] := ticks[[2, 1]];
 frameSideTickSpec[ticks_, "Top"] := ticks[[2, 2]];
 
 frameSideNodes[g_, pr_, frame_, side_] :=
-	Module[{opts, frameStyle, tickStyle, ticks, sideTicks},
+	Module[{
+			opts,
+			frameStyle,
+			tickStyle,
+			ticks,
+			sideTicks
+		},
 		If[!TrueQ[frameSideEnabled[frame, side]],
 			{},
 			opts = plotOptionAssociation[g];
@@ -543,9 +579,7 @@ frameSideNodes[g_, pr_, frame_, side_] :=
 			ticks = frameTicksNormalize[Lookup[opts, FrameTicks, Automatic]];
 			sideTicks = frameSideTickSpec[ticks, side];
 			Join[
-				{
-					decorationNode[frameLinePrimitive[pr, side], frameStyle]
-				},
+				{decorationNode[frameLinePrimitive[pr, side], frameStyle]},
 				tickNodes[
 					frameSideTicks[sideTicks, pr, side],
 					frameSideBase[pr, side],
@@ -571,10 +605,7 @@ labelSpecs[opts_] :=
 	Flatten[{Replace[Lookup[opts, LabelStyle, {}], None | Automatic -> {}]}];
 
 axisLabelSpecs[opts_] :=
-	Join[
-		{FontSize -> 12, FontFamily -> "sans-serif", FontColor -> GrayLevel[0.35]},
-		labelSpecs[opts]
-	];
+	Join[{FontSize -> 12, FontFamily -> "sans-serif"}, labelSpecs[opts]];
 
 axisLabelAttrs[] := {"class" -> "wgx-axis-label"};
 
@@ -617,15 +648,7 @@ plotLabelNodes[g_, props_] :=
 			{},
 			wh = svgSize[props];
 			specs = Join[{FontSize -> 14, Bold}, labelSpecs[opts]];
-			{
-				absTextNode[
-					label,
-					{wh[[1]] / 2, 18},
-					"middle",
-					"middle",
-					specs
-				]
-			}
+			{absTextNode[label, {wh[[1]] / 2, 18}, "middle", "middle", specs]}
 		]
 	];
 
@@ -683,10 +706,7 @@ axisLabelNodes[g_, props_] :=
 							Null,
 							absTextNode[
 								labels[[2]],
-								{
-									0,
-									Max[12, mapY[pr[[2, 2]]] - 18]
-								},
+								{0, Max[12, mapY[pr[[2, 2]]] - 18]},
 								"start",
 								"middle",
 								specs,
@@ -794,26 +814,369 @@ roundingAttr[{rx_?NumericQ, ry_?NumericQ}] :=
 	{"rx" -> wPx[rx], "ry" -> hPx[ry]};
 roundingAttr[_] := {};
 
-bezierPath[pts_] :=
-	Module[{rest = Rest[pts], cubics, extra},
-		cubics = Partition[rest, 3];
-		extra = Drop[rest, 3  Length[cubics]];
-		StringJoin[
-			"M ",
-			ptStr[First[pts]],
-			(
-				StringJoin[
-					" C ",
-					ptStr[#[[1]]],
-					" ",
-					ptStr[#[[2]]],
-					" ",
-					ptStr[#[[3]]]
+pixelPtStr[p_] :=
+	StringJoin[ makeSvgNumber[p[[1]]], ",", makeSvgNumber[p[[2]]]];
+
+pixelOpenPath[pts_] :=
+	StringJoin[
+		"M ",
+		pixelPtStr[First[pts]],
+		(StringJoin[ " L ", pixelPtStr[#]])& /@ Rest[pts]
+	];
+
+pixelPathJoin[parts_] := StringRiffle[DeleteCases[parts, ""], " "];
+
+pixelLineTail[pts_] :=
+	StringRiffle[(StringJoin[ "L ", pixelPtStr[#]])& /@ Rest[pts], " "];
+
+pixelLinePath[pts_] :=
+	pixelPathJoin[
+		{StringJoin[ "M ", pixelPtStr[First[pts]]], pixelLineTail[pts]}
+	];
+
+bezierDegree[pts_, opts___] :=
+	Module[{
+			d =
+				Lookup[
+					Association[FilterRules[{opts}, SplineDegree]],
+					SplineDegree,
+					Automatic
 				]
-			)& /@ cubics,
-			(StringJoin[ " L ", ptStr[#]])& /@ extra
+		},
+		Which[ IntegerQ[d] && d > 0, d, True, Min[3, Max[1, Length[pts] - 1]]]
+	];
+
+bezierClosedQ[opts___] :=
+	TrueQ[
+		Lookup[Association[FilterRules[{opts}, SplineClosed]], SplineClosed, False]
+	];
+
+quadraticBezierCommand[{p0_, p1_, p2_}] :=
+	Module[{c1, c2},
+		c1 = p0 + (2 / 3)  (p1 - p0);
+		c2 = p2 + (2 / 3)  (p1 - p2);
+		StringJoin[ "C ", pixelPtStr[c1], " ", pixelPtStr[c2], " ", pixelPtStr[p2]]
+	];
+
+cubicBezierCommand[{_, p1_, p2_, p3_}] :=
+	StringJoin[ "C ", pixelPtStr[p1], " ", pixelPtStr[p2], " ", pixelPtStr[p3]];
+
+sampledBezierCommand[pts_] :=
+	Module[{f, n},
+		f = BezierFunction[pts];
+		n = Clip[4  Length[pts], {24, 200}];
+		pixelLineTail[Table[f[t], {t, 0, 1, 1. / n}]]
+	];
+
+pixelBezierSegmentCommand[pts_] :=
+	Switch[Length[pts],
+		1,
+			"",
+		2,
+			StringJoin[ "L ", pixelPtStr[pts[[2]]]],
+		3,
+			quadraticBezierCommand[pts],
+		4,
+			cubicBezierCommand[pts],
+		_,
+			sampledBezierCommand[pts]
+	];
+
+pixelBezierTail[pts_, opts___] :=
+	Module[{
+			degree = bezierDegree[pts, opts],
+			rest = Rest[pts],
+			current = First[pts],
+			cmds = {},
+			take,
+			chunk
+		},
+		While[
+			rest =!= {},
+			take = Take[rest, UpTo[degree]];
+			chunk = Prepend[take, current];
+			AppendTo[cmds, pixelBezierSegmentCommand[chunk]];
+			current = Last[take];
+			rest = Drop[rest, Length[take]]
+		];
+		pixelPathJoin[cmds]
+	];
+
+pixelBezierPath[pts_, opts___] :=
+	pixelPathJoin[
+		{
+			StringJoin[ "M ", pixelPtStr[First[pts]]],
+			pixelBezierTail[pts, opts],
+			If[bezierClosedQ[opts], "Z", ""]
+		}
+	];
+
+bezierPath[pts_, opts___] := pixelBezierPath[pointPx /@ pts, opts];
+
+bSplinePixelPoints[pts_, opts___] :=
+	Module[{f, n},
+		f = BSplineFunction[pts, FilterRules[{opts}, Options[BSplineFunction]]];
+		n = Clip[4  Length[pts], {24, 200}];
+		Table[f[t], {t, 0, 1, 1. / n}]
+	];
+
+bSplinePath[pts_, opts___] :=
+	pixelOpenPath[bSplinePixelPoints[pointPx /@ pts, opts]];
+
+curvePtsQ[pts_] := MatchQ[pts, {__}] && AllTrue[pts, graphicsPointQ];
+
+curveSegmentQ[Line[pts_?curvePtsQ, ___]] := True;
+curveSegmentQ[BezierCurve[pts_?curvePtsQ, ___]] := True;
+curveSegmentQ[BSplineCurve[pts_?curvePtsQ, ___]] := True;
+curveSegmentQ[_] := False;
+
+curveComponentQ[segments_List] :=
+	segments =!= {} && AllTrue[segments, curveSegmentQ];
+curveComponentQ[_] := False;
+
+curveComponents[segment_?curveSegmentQ] := {{segment}};
+curveComponents[segments_List] /; curveComponentQ[segments] := {segments};
+curveComponents[components_List] /; AllTrue[components, curveComponentQ] :=
+	components;
+curveComponents[_] := $Failed;
+
+curveContinuePoints[pts_, None] := pts;
+curveContinuePoints[pts_, current_] := Prepend[pts, current];
+
+curveSegmentPath[Line[pts_?curvePtsQ, ___], current_, start_] :=
+	Module[{
+			px = curveContinuePoints[pointPx /@ pts, current]
+		},
+		{If[start, pixelLinePath[px], pixelLineTail[px]], Last[px]}
+	];
+curveSegmentPath[BezierCurve[pts_?curvePtsQ, opts___], current_, start_] :=
+	Module[{
+			px = curveContinuePoints[pointPx /@ pts, current]
+		},
+		{If[start, pixelBezierPath[px, opts], pixelBezierTail[px, opts]], Last[px]}
+	];
+curveSegmentPath[BSplineCurve[pts_?curvePtsQ, opts___], current_, start_] :=
+	Module[{px, sampled},
+		px = curveContinuePoints[pointPx /@ pts, current];
+		sampled = bSplinePixelPoints[px, opts];
+		{If[start, pixelLinePath[sampled], pixelLineTail[sampled]], Last[sampled]}
+	];
+
+componentClosedQ[closed_List, i_, default_] :=
+	If[i <= Length[closed], TrueQ[closed[[i]]], default];
+componentClosedQ[closed_, _, _] := TrueQ[closed];
+
+curveComponentPath[segments_, closed_] :=
+	Module[{
+			current = None,
+			start = True,
+			cmds = {},
+			part,
+			failed = False
+		},
+		Do[
+			part = curveSegmentPath[segment, current, start];
+			If[part === $Failed,
+				failed = True;
+				Break[],
+				If[part[[1]] =!= "", AppendTo[cmds, part[[1]]]];
+				current = part[[2]];
+				start = False
+			],
+			{segment, segments}
+		];
+		If[failed, $Failed, pixelPathJoin[Join[cmds, {If[TrueQ[closed], "Z", ""]}]]]
+	];
+
+joinedCurvePath[spec_, closedSpec_ : False] :=
+	Module[{
+			components = curveComponents[spec],
+			paths
+		},
+		If[components === $Failed,
+			$Failed,
+			paths =
+				MapIndexed[
+					curveComponentPath[
+						#1,
+						componentClosedQ[closedSpec, First[#2], False]
+					]&,
+					components
+				];
+			If[MemberQ[paths, $Failed], $Failed, pixelPathJoin[paths]]
 		]
 	];
+
+filledCurvePath[spec_] :=
+	Module[{
+			components = curveComponents[spec],
+			paths
+		},
+		If[components === $Failed,
+			$Failed,
+			paths = curveComponentPath[#, True]& /@ components;
+			If[MemberQ[paths, $Failed], $Failed, pixelPathJoin[paths]]
+		]
+	];
+
+codedSegmentQ[{t_Integer, n_Integer, d_Integer}] :=
+	MemberQ[{0, 1, 2}, t] && n > 0 && d >= 0;
+codedSegmentQ[_] := False;
+
+codedComponentQ[segments_List] :=
+	segments =!= {} && AllTrue[segments, codedSegmentQ];
+codedComponentQ[_] := False;
+
+codedComponents[segments_List] /; codedComponentQ[segments] := {segments};
+codedComponents[components_List] /; AllTrue[components, codedComponentQ] :=
+	components;
+codedComponents[_] := $Failed;
+
+codedPointComponents[pts_?curvePtsQ] := {pts};
+codedPointComponents[components_List] /; AllTrue[components, curvePtsQ] :=
+	components;
+codedPointComponents[_] := $Failed;
+
+bezierLastControl[pts_, degree_] :=
+	Module[{
+			rest = Rest[pts],
+			current = First[pts],
+			control = First[pts],
+			take,
+			chunk
+		},
+		While[
+			rest =!= {},
+			take = Take[rest, UpTo[Max[1, degree]]];
+			chunk = Prepend[take, current];
+			control =
+				Switch[Length[chunk],
+					1,
+						current,
+					2,
+						current,
+					3,
+						chunk[[2]],
+					_,
+						chunk[[-2]]
+				];
+			current = Last[take];
+			rest = Drop[rest, Length[take]]
+		];
+		control
+	];
+
+codedLinePath[pts_, start_] :=
+	If[start, pixelLinePath[pts], pixelLineTail[pts]];
+
+codedBezierPath[pts_, degree_, start_] :=
+	If[start,
+		pixelBezierPath[pts, SplineDegree -> degree],
+		pixelBezierTail[pts, SplineDegree -> degree]
+	];
+
+codedSegmentPath[{kind_, n_, degree_}, px_, i_, state_] :=
+	Module[{
+			start = state["Start"],
+			current = state["Current"],
+			control = state["Control"],
+			take,
+			pts,
+			cmd
+		},
+		If[i + n - 1 > Length[px],
+			$Failed,
+			take = Take[px, {i, i + n - 1}];
+			pts =
+				Switch[kind,
+					0 | 1,
+						If[start, take, Prepend[take, current]],
+					2,
+						If[start, take, Join[{current, 2  current - control}, take]],
+					_,
+						$Failed
+				];
+			If[pts === $Failed,
+				$Failed,
+				cmd =
+					Switch[kind,
+						0,
+							codedLinePath[pts, start],
+						1 | 2,
+							codedBezierPath[pts, degree, start],
+						_,
+							$Failed
+					];
+				If[cmd === $Failed,
+					$Failed,
+					<|
+						"Command" -> cmd,
+						"Current" -> Last[pts],
+						"Control" -> If[kind == 0,
+							If[Length[pts] >= 2, pts[[-2]], Last[pts]],
+							bezierLastControl[pts, degree]
+						],
+						"Index"   -> i + n
+					|>
+				]
+			]
+		]
+	];
+
+codedCurveComponentPath[codes_, pts_, closed_] :=
+	Module[{
+			px = pointPx /@ pts,
+			state = <|"Start" -> True, "Current" -> None, "Control" -> None|>,
+			i = 1,
+			cmds = {},
+			part,
+			failed = False
+		},
+		Do[
+			part = codedSegmentPath[code, px, i, state];
+			If[part === $Failed,
+				failed = True;
+				Break[],
+				If[part["Command"] =!= "", AppendTo[cmds, part["Command"]]];
+				state =
+					<|
+						"Start"   -> False,
+						"Current" -> part["Current"],
+						"Control" -> part["Control"]
+					|>;
+				i = part["Index"]
+			],
+			{code, codes}
+		];
+		If[failed, $Failed, pixelPathJoin[Join[cmds, {If[TrueQ[closed], "Z", ""]}]]]
+	];
+
+codedCurvePath[codes_, coords_, closedSpec_, defaultClosed_] :=
+	Module[{codeComps, pointComps, paths},
+		codeComps = codedComponents[codes];
+		pointComps = codedPointComponents[coords];
+		If[codeComps === $Failed ||
+		pointComps === $Failed ||
+		Length[codeComps] =!= Length[pointComps],
+			$Failed,
+			paths =
+				MapIndexed[
+					codedCurveComponentPath[
+						#1,
+						pointComps[[First[#2]]],
+						componentClosedQ[closedSpec, First[#2], defaultClosed]
+					]&,
+					codeComps
+				];
+			If[MemberQ[paths, $Failed], $Failed, pixelPathJoin[paths]]
+		]
+	];
+
+codedJoinedCurvePath[codes_, coords_, closedSpec_ : False] :=
+	codedCurvePath[codes, coords, closedSpec, False];
+
+codedFilledCurvePath[codes_, coords_] :=
+	codedCurvePath[codes, coords, True, True];
 
 ellipseGeom[{x_, y_}, rx_, ry_] :=
 	(*

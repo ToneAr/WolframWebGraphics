@@ -98,9 +98,9 @@ swatchLegendNodes[styles_, labels_, {x_, y_}, layout_, labelStyle_] :=
 						"rect",
 						Join[
 							{
-								"x" -> makeSvgNumber[px + 8],
-								"y" -> makeSvgNumber[py + 7],
-								"width" -> "14",
+								"x"      -> makeSvgNumber[px + 8],
+								"y"      -> makeSvgNumber[py + 7],
+								"width"  -> "14",
 								"height" -> "14"
 							},
 							getCurrentStyleProps[bag, "Filled"]
@@ -151,11 +151,11 @@ barLegendNodes[legend_, {x_, y_}] :=
 					XMLElement[
 						"rect",
 						{
-							"x" -> makeSvgNumber[x],
-							"y" -> makeSvgNumber[yy],
-							"width" -> makeSvgNumber[w],
+							"x"      -> makeSvgNumber[x],
+							"y"      -> makeSvgNumber[yy],
+							"width"  -> makeSvgNumber[w],
 							"height" -> makeSvgNumber[h / n + 1],
-							"fill" -> c["rgb"]
+							"fill"   -> c["rgb"]
 						},
 						{}
 					]
@@ -174,12 +174,12 @@ barLegendNodes[legend_, {x_, y_}] :=
 				XMLElement[
 					"rect",
 					{
-						"x" -> makeSvgNumber[x],
-						"y" -> makeSvgNumber[y],
-						"width" -> makeSvgNumber[w],
-						"height" -> makeSvgNumber[h],
-						"fill" -> "none",
-						"stroke" -> "#666666",
+						"x"            -> makeSvgNumber[x],
+						"y"            -> makeSvgNumber[y],
+						"width"        -> makeSvgNumber[w],
+						"height"       -> makeSvgNumber[h],
+						"fill"         -> "none",
+						"stroke"       -> "#666666",
 						"stroke-width" -> "1"
 					},
 					{}
@@ -190,11 +190,11 @@ barLegendNodes[legend_, {x_, y_}] :=
 					XMLElement[
 						"line",
 						{
-							"x1" -> makeSvgNumber[x + w],
-							"y1" -> makeSvgNumber[tick[[3]]],
-							"x2" -> makeSvgNumber[x + w + 5],
-							"y2" -> makeSvgNumber[tick[[3]]],
-							"stroke" -> "#444444",
+							"x1"           -> makeSvgNumber[x + w],
+							"y1"           -> makeSvgNumber[tick[[3]]],
+							"x2"           -> makeSvgNumber[x + w + 5],
+							"y2"           -> makeSvgNumber[tick[[3]]],
+							"stroke"       -> "#444444",
 							"stroke-width" -> "1"
 						},
 						{}
@@ -245,12 +245,12 @@ legendElement[legend_, {x_, y_}] :=
 				XMLElement[
 					"rect",
 					{
-						"x" -> makeSvgNumber[x],
-						"y" -> makeSvgNumber[y],
-						"width" -> makeSvgNumber[size[[1]]],
-						"height" -> makeSvgNumber[size[[2]]],
-						"fill" -> "#ffffff",
-						"stroke" -> "#d0d0d0",
+						"x"            -> makeSvgNumber[x],
+						"y"            -> makeSvgNumber[y],
+						"width"        -> makeSvgNumber[size[[1]]],
+						"height"       -> makeSvgNumber[size[[2]]],
+						"fill"         -> "#ffffff",
+						"stroke"       -> "#d0d0d0",
 						"stroke-width" -> "1"
 					},
 					{}

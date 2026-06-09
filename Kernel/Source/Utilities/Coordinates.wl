@@ -7,6 +7,7 @@ PackageScoped[
 		hPx,
 		pointPx,
 		graphicsPointQ,
+		graphicsPtsQ,
 		ptStr,
 		ptsStr,
 		openPath,
@@ -23,12 +24,12 @@ PackageScoped[
  * at -y but NOT mirrored, so they read the right way up. All attribute values
  * are strings.
  *)
-(* data coordinate -> pixel string (mapX/mapY carry the data->px affine) *)
+(* Data coordinate -> Pixel string *)
 xPx[x_] := makeSvgNumber[mapX[x]];
 
 yPx[y_] := makeSvgNumber[mapY[y]];
 
-(* a data-space length -> pixel length (per-axis px scale) *)
+(* Data-space length -> Pixel length *)
 wPx[d_] := makeSvgNumber[sclX[]  d];
 
 hPx[d_] := makeSvgNumber[sclY[]  d];
@@ -37,23 +38,20 @@ pointPx[{x_?NumericQ, y_?NumericQ}] := {mapX[x], mapY[y]};
 pointPx[Scaled[{sx_?NumericQ, sy_?NumericQ}]] :=
 	pointPx[resolveScaledPt[{sx, sy}]];
 pointPx[
-	Scaled[
-		{sx_?NumericQ, sy_?NumericQ},
-		base : {_?NumericQ, _?NumericQ}
-	]
-] := pointPx[resolveScaledPt[{sx, sy}, base]];
+	Scaled[{sx_?NumericQ, sy_?NumericQ}, base : {_?NumericQ, _?NumericQ}]
+] :=
+	pointPx[resolveScaledPt[{sx, sy}, base]];
 pointPx[Offset[{dx_?NumericQ, dy_?NumericQ}, base_?graphicsPointQ]] :=
 	With[{p = pointPx[base]}, {p[[1]] + dx, p[[2]] - dy}];
 
 graphicsPointQ[{_?NumericQ, _?NumericQ}] := True;
 graphicsPointQ[Scaled[{_?NumericQ, _?NumericQ}]] := True;
-graphicsPointQ[
-	Scaled[{_?NumericQ, _?NumericQ}, {_?NumericQ, _?NumericQ}]
-] := True;
-graphicsPointQ[
-	Offset[{_?NumericQ, _?NumericQ}, base_?graphicsPointQ]
-] := True;
+graphicsPointQ[Scaled[{_?NumericQ, _?NumericQ}, {_?NumericQ, _?NumericQ}]] :=
+	True;
+graphicsPointQ[Offset[{_?NumericQ, _?NumericQ}, base_?graphicsPointQ]] := True;
 graphicsPointQ[_] := False;
+
+graphicsPtsQ[pts_] := MatchQ[pts, {__}] && AllTrue[pts, graphicsPointQ];
 
 ptStr[p_?graphicsPointQ] :=
 	With[{px = pointPx[p]},
@@ -85,5 +83,4 @@ forkBag[props_] := Internal`Bag[Internal`BagPart[props, All]];
 
 styleAttr[props_, type_] := Sequence @@ getCurrentStyleProps[props, type];
 
-uid[prefix_] :=
-	StringJoin[ prefix, "-", IntegerString[RandomInteger[16 ^ 12], 16, 12]];
+uid[prefix_] := CreateUUID[StringJoin[ prefix, "-"]];
