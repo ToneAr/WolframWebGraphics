@@ -1,0 +1,40 @@
+{
+	"name": "@wgx/js-runtime",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"files": ["dist"],
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/wgx-runtime.js"
+		},
+		"./2d": {
+			"types": "./dist/2D/SVGRuntime.d.ts",
+			"import": "./dist/wgx-runtime-lib-2d.js"
+		},
+		"./3d": {
+			"types": "./dist/3D/ThreeRuntime.d.ts",
+			"import": "./dist/wgx-runtime-lib-3d.js"
+		},
+		"./wgx.css": "./dist/wgx.css"
+	},
+	"scripts": {
+		"dev": "bunx --bun vite",
+		"build": "tsc && bunx --bun vite build && WGX_BUILD=inline bunx --bun vite build",
+		"preview": "bunx --bun vite preview",
+		"typecheck": "tsc"
+	},
+	"devDependencies": {
+		"@types/three": "^0.184.1",
+		"@wgx/types": "workspace:*",
+		"terser": "^5.48.0",
+		"typescript": "~6.0.2",
+		"vite": "^8.0.12",
+		"vite-plugin-dts": "^4.0.0"
+	},
+	"dependencies": {
+		"three": "^0.184.0"
+	}
+}

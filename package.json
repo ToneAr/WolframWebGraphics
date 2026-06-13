@@ -1,0 +1,18 @@
+{
+	"name": "@wgx/main",
+	"workspaces": [
+		"packages/*"
+	],
+	"dependencies": {},
+	"scripts": {
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"paclet:build": "bun run --cwd packages/paclet build",
+		"js:dev": "bun run --cwd packages/runtime dev",
+		"js:build": "bun run --cwd packages/runtime build",
+		"js:preview": "bun run --cwd packages/runtime preview",
+		"js:typecheck": "bun run --cwd packages/runtime typecheck",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
+	}
+}

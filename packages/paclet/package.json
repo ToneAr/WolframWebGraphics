@@ -1,0 +1,10 @@
+{
+	"name": "@egx/paclet",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"files": ["build"],
+	"scripts": {
+		"build": "wolframscript -file build.wls"
+	}
+}
