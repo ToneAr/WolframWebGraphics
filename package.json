@@ -7,6 +7,7 @@
 	"scripts": {
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
+		"build": "bun run paclet:build -b",
 		"paclet:build": "bun run --cwd packages/paclet build",
 		"js:dev": "bun run --cwd packages/runtime dev",
 		"js:build": "bun run --cwd packages/runtime build",

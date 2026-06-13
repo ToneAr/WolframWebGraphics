@@ -40,20 +40,18 @@ Map[
 ];
 
 (* Build archive *)
-If[!DirectoryQ[FileNameJoin[{ParentDirectory @ pacletRoot, "build", "Paclet"}]],
-	CreateDirectory[
-		FileNameJoin[{ParentDirectory @ pacletRoot, "build", "Paclet"}],
-		CreateIntermediateDirectories -> True
-	]
-];
-PacletTools`PacletBuild[
-	pacletRoot,
-	FileNameJoin[{ParentDirectory[pacletRoot, 2], "build", "Paclet"}]
-] //
-Function[
-	If[FailureQ[#],
-		CL["Log", "FAIL", "Paclet build failed"];
-		Exit[1]
+With[{
+		buildDir = FileNameJoin[{ParentDirectory[pacletRoot, 2], "build", "Paclet"}]
+	},
+	If[!DirectoryQ[buildDir],
+		CreateDirectory[buildDir, CreateIntermediateDirectories -> True]
+	];
+	PacletTools`PacletBuild[pacletRoot, buildDir] //
+	Function[
+		If[FailureQ[#],
+			CL["Log", "FAIL", "Paclet build failed"];
+			Exit[1]
+		]
 	]
 ];
 
