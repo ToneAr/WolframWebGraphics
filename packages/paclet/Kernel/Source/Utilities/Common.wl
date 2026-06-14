@@ -65,8 +65,18 @@ svgElement[g : Graphics[{prims___}, opts : OptionsPattern[Graphics]]] :=
 		 * since the external/page-level runtime relies on the same selector.
 		 *)
 		If[TrueQ[$wgxNeedsRuntime], props["id"] = uid["wgx"]];
+		(*
+		 * The status sink (<text id='wgx-status'>) rides with the graphic
+		 * whenever interactivity is present, independent of IncludeRuntime, so
+		 * StatusArea still resolves a sink when the runtime is hosted externally
+		 * (shared-runtime / SSR pages).
+		 *)
+		If[TrueQ[$wgxNeedsRuntime],
+			children =
+				Join[{statusNode[Lookup[props, "viewBox", Missing[]]]}, children]
+		];
 		If[TrueQ[$wgxInlineRuntime] && TrueQ[$wgxNeedsRuntime],
-			children = Join[runtimeNodes[props], children]
+			children = Join[runtimeNodes[], children]
 		];
 		result = XMLElement["svg", Normal[props], children];
 		setMapState[savedMap];
@@ -415,36 +425,36 @@ cssAlign["text-after-edge"] := "flex-end";
 cssAlign[_] := "center";
 
 mathFontCss[props_] :=
-	DeleteCases[
-		{
-			If[KeyExistsQ[props, "fill"], StringJoin[ "color:", props["fill"]], Null],
-			If[KeyExistsQ[props, "fill-opacity"],
-				StringJoin[ "opacity:", props["fill-opacity"]],
-				Null
-			],
-			If[KeyExistsQ[props, "font-size"],
-				StringJoin[ "font-size:", props["font-size"], "px"],
-				Null
-			],
-			If[KeyExistsQ[props, "font-family"],
-				StringJoin[ "font-family:", props["font-family"]],
-				Null
-			],
-			If[KeyExistsQ[props, "font-weight"],
-				StringJoin[ "font-weight:", props["font-weight"]],
-				Null
-			],
-			If[KeyExistsQ[props, "font-style"],
-				StringJoin[ "font-style:", props["font-style"]],
-				Null
-			],
-			If[KeyExistsQ[props, "text-decoration"],
-				StringJoin[ "text-decoration:", props["text-decoration"]],
-				Null
-			]
-		},
-		Null
-	];
+	{
+		If[KeyExistsQ[props, "fill"],
+			StringJoin[ "color:", props["fill"]],
+			Nothing
+		],
+		If[KeyExistsQ[props, "fill-opacity"],
+			StringJoin[ "opacity:", props["fill-opacity"]],
+			Nothing
+		],
+		If[KeyExistsQ[props, "font-size"],
+			StringJoin[ "font-size:", props["font-size"], "px"],
+			Nothing
+		],
+		If[KeyExistsQ[props, "font-family"],
+			StringJoin[ "font-family:", props["font-family"]],
+			Nothing
+		],
+		If[KeyExistsQ[props, "font-weight"],
+			StringJoin[ "font-weight:", props["font-weight"]],
+			Nothing
+		],
+		If[KeyExistsQ[props, "font-style"],
+			StringJoin[ "font-style:", props["font-style"]],
+			Nothing
+		],
+		If[KeyExistsQ[props, "text-decoration"],
+			StringJoin[ "text-decoration:", props["text-decoration"]],
+			Nothing
+		]
+	};
 
 mathMLElement[expr_] :=
 	Module[{mathString, xml},
@@ -523,7 +533,7 @@ sanitizeMathMLElement[s_String] :=
 	Module[{
 			clean = StringReplace[s, mathGlyphReplacementRules[]]
 		},
-		If[clean === "", Null, clean]
+		If[clean =!= "", clean]
 	];
 sanitizeMathMLElement[other_] := other;
 

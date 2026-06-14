@@ -4,7 +4,9 @@
 <head>
 	<meta charset="utf-8">
 	<title>WebGraphics gallery</title>
-	<wolfram:slot id="style" />
+	<wolfram:slot id="demo-style" />
+	<wolfram:slot id="rt-style" />
+	<wolfram:slot id="lib2d" />
 	<wolfram:slot id="lib3d" />
 </head>
 
@@ -16,8 +18,9 @@
 			<div class="card">
 				<h2><wolfram:slot id="1" /></h2>
 				<p><wolfram:slot id="2" /></p>
+				<p><wolfram:slot id="4" /></p>
 				<wolfram:expr>
-					ToWebGraphics[#3]
+					ToWebGraphics[#3, "IncludeRuntime" -> False]
 				</wolfram:expr>
 			</div>
 		</wolfram:sequence>

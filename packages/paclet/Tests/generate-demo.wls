@@ -1,5 +1,5 @@
 #!/usr/bin/wolframscript
-(* wl-disable-file DocCommentMismatch *)
+(* wl-disable-file DocCommentMismatch, DocCommentInputMismatch *)
 here = DirectoryName[$InputFileName];
 PacletDirectoryLoad[ParentDirectory[here]];
 Needs["ToneAr`WebGraphics`"];
@@ -639,27 +639,45 @@ examples =
 	};
 
 (* ----------------------------------------------------------------------- *)
-css =
-	ToneAr`WebGraphics`PackageScope`compactifyCSS @
-	Import[
-		PacletObject["ToneAr/WebGraphics"]["AssetLocation", "demo.css"],
-		"Text"
-	]
-
 html =
 	XMLTemplate[
 		File @
 		PacletObject["ToneAr/WebGraphics"]["AssetLocation", "demo.template.html"]
 	][
 		<|
-			"style"    -> StringJoin[ "<style>", css, "</style>"],
-			"lib3d"    -> ToneAr`WebGraphics`PackageScope`wgx3DLibraryTag[],
-			"examples" -> examples
+			"demo-style" -> StringJoin[
+				"<style>",
+				Import[
+					File @
+					PacletObject["ToneAr/WebGraphics"]["AssetLocation", "demo.css"],
+					"Text"
+				],
+				"</style>"
+			],
+			"rt-style"   -> StringJoin[
+				"<style>",
+				WebGraphicsRuntimeStyle[],
+				"</style>"
+			],
+			"lib2d"      -> StringJoin[
+				"<script>",
+				WebGraphics2DInlineScript[],
+				"</script>"
+			],
+			"lib3d"      -> StringJoin[
+				"<script>",
+				WebGraphics3DInlineScript[],
+				"</script>"
+			],
+			"examples"   -> examples
 		|>
 	];
 
-out = FileNameJoin[{here, "demo-gallery.html"}];
+co =
+	CloudDeploy[
+		ExportForm[html, "HTML"],
+		"WGX/demo-gallery.html",
+		Permissions -> "Public"
+	]
 
-Export[out, html, "Text", OverwriteTarget -> True];
-
-Print["Wrote ", Length[examples], " examples: ", out];
+Print["Wrote ", Length[examples], " examples: ", First[co]];

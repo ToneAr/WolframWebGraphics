@@ -9,6 +9,8 @@
 		"lint:fix": "eslint . --fix",
 		"build": "bun run paclet:build -b",
 		"paclet:build": "bun run --cwd packages/paclet build",
+		"paclet:test": "bun run --cwd packages/paclet test",
+		"deploy:demo": "bun run --cwd packages/paclet deploy:demo",
 		"js:dev": "bun run --cwd packages/runtime dev",
 		"js:build": "bun run --cwd packages/runtime build",
 		"js:preview": "bun run --cwd packages/runtime preview",

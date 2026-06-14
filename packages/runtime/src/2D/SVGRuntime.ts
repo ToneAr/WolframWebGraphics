@@ -167,21 +167,17 @@ export default class SVGRuntime {
 				"[data-wgx-status-id]:not([data-wgx-hydrated])",
 			);
 			for (const statusArea of statusAreas) {
-				const statusId = statusArea.getAttribute("data-wgx-status-id");
-				if (!statusId) {
-					continue;
-				}
-				const statusNode = statusId ? svg.getElementById(statusId) : null;
-				if (statusNode) {
-					const label = statusNode.getAttribute("data-wgx-status-text") ?? "";
-					statusArea.addEventListener("mouseover", (event) => {
-						this.setStatusText(event, label);
-					});
-					statusArea.addEventListener("mouseout", (event) => {
-						this.clearStatusText(event);
-					});
-					statusArea.setAttribute("data-wgx-hydrated", "true");
-				}
+				// The label rides on the status-area element itself (mirroring the
+				// hover/click hydrators); `data-wgx-status-id` is just the marker the
+				// selector keys off, not a reference to some other node.
+				const label = statusArea.getAttribute("data-wgx-status-text") ?? "";
+				statusArea.addEventListener("mouseover", (event) => {
+					this.setStatusText(event, label);
+				});
+				statusArea.addEventListener("mouseout", (event) => {
+					this.clearStatusText(event);
+				});
+				statusArea.setAttribute("data-wgx-hydrated", "true");
 			}
 		});
 	}

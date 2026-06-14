@@ -5,7 +5,9 @@ serialize[Graphics[prim_, opts : OptionsPattern[Graphics]]] :=
 serialize[graphics : Graphics[{prims___}, opts : OptionsPattern[Graphics]]] :=
 	svgString[svgElement[graphics]];
 serialize[Legended[graphics : _Graphics, legend_]] :=
-	svgString[svgElementWithLegend[svgElement[graphics], legend]]
+	svgString[svgElementWithLegend[svgElement[graphics], legend]];
+serialize[Labeled[graphics : _Graphics, label_, pos_ : Top, ___]] :=
+	svgString[svgElementWithLabel[svgElement[graphics], label, pos]];
 (* ::Section:: *) (* GeoGraphics *)
 (*
  * GeoGraphics support:

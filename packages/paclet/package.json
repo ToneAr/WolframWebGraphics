@@ -5,6 +5,8 @@
 	"type": "module",
 	"files": ["build"],
 	"scripts": {
-		"build": "wolframscript -file build.wls"
+		"build": "wolframscript -file build.wls",
+		"test": "wolframscript -file Tests/run.wls",
+		"deploy:demo": "wolframscript -file Tests/generate-demo.wls"
 	}
 }

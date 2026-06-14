@@ -3,7 +3,9 @@ PackageExported[
 		ToWebGraphics,
 		WebGraphicsRuntimeStyle,
 		WebGraphics3DRuntimeScript,
+		WebGraphics3DInlineScript,
 		WebGraphics2DRuntimeScript,
+		WebGraphics2DInlineScript,
 		WebGraphicsRuntimeScript,
 		CreateWebGraphicsRuntime
 	}
@@ -79,6 +81,13 @@ WebGraphicsRuntimeScript[] :=
 			"Text"
 		];
 
+WebGraphics2DInlineScript[] :=
+	WebGraphics2DInlineScript[] =
+		Import[
+			PacletObject["ToneAr/WebGraphics"]["AssetLocation", "wgx-lib-2d.js"],
+			"Text"
+		];
+
 WebGraphics2DRuntimeScript[] :=
 	WebGraphics2DRuntimeScript[] =
 		Import[
@@ -88,6 +97,13 @@ WebGraphics2DRuntimeScript[] :=
 			],
 			"Text"
 		]
+
+WebGraphics3DInlineScript[] :=
+	WebGraphics3DInlineScript[] =
+		Import[
+			PacletObject["ToneAr/WebGraphics"]["AssetLocation", "wgx-lib-3d.js"],
+			"Text"
+		];
 
 WebGraphics3DRuntimeScript[] :=
 	WebGraphics3DRuntimeScript[] =
