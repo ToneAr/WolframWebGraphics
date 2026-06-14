@@ -3,7 +3,9 @@ PackageExported[
 		ToWebGraphics,
 		WebGraphicsRuntimeStyle,
 		WebGraphics3DRuntimeScript,
+		WebGraphics3DInlineScript,
 		WebGraphics2DRuntimeScript,
+		WebGraphics2DInlineScript,
 		WebGraphicsRuntimeScript,
 		CreateWebGraphicsRuntime
 	}
@@ -32,43 +34,38 @@ ToWebGraphics[graphics : $$graphicsP, opts : OptionsPattern[]] :=
 			];
 		CatchExceptions[
 			serialize[graphics],
-			{
-				ToWebGraphicsError        -> mainErrorHandler,
-				ToWebGraphicsNetworkError -> networkErrorHandler
-			}
+			{ToWebGraphicsError -> mainErrorHandler}
 		]
 	);
 
 (* ::Section:: *) (* Public Runtime Helpers *)
-CreateWebGraphicsRuntime[] :=
-	CreateWebGraphicsRuntime[FileNameJoin[{Directory[], "wgx-runtime"}]];
-CreateWebGraphicsRuntime[dir_String] :=
-	Module[{},
+(* -------------------------------------------------------------------------- *)
+(* ::Subsection:: *) (* CreateWebGraphicsRuntime *)
+(* Description:  Description
+ * Return:       ReturnPattern
+ *)
+CreateWebGraphicsRuntime // Options = {Options[Export] // Splice}
+CreateWebGraphicsRuntime[opts : OptionsPattern[]] :=
+	CreateWebGraphicsRuntime[FileNameJoin[{Directory[], "wgx-runtime"}], opts];
+CreateWebGraphicsRuntime[dir_String, opts : OptionsPattern[]] :=
+	Module[{fileBag = Internal`Bag[]},
 		Enclose[
 			If[!DirectoryQ[dir], Confirm @ CreateDirectory[dir]];
-			Confirm @
-			Export[FileNameJoin[{dir, "wgx.css"}], WebGraphicsRuntimeStyle[], "Text"];
-			Confirm @
-			Export[
-				FileNameJoin[{dir, "wgx-runtime.js"}],
-				WebGraphicsRuntimeScript[],
-				"Text"
-			];
-			Confirm @
-			Export[
-				FileNameJoin[{dir, "wgx-runtime-lib-2d.js"}],
-				WebGraphics2DRuntimeScript[],
-				"Text"
-			];
-			Confirm @
-			Export[
-				FileNameJoin[{dir, "wgx-runtime-lib-3d.js"}],
-				WebGraphics3DRuntimeScript[],
-				"Text"
-			];
-			dir
+			Function[
+				Internal`StuffBag[
+					fileBag,
+					Export[FileNameJoin[{dir, #1}], #2, "Text"],
+					Sequence @@ FilterRules[{opts}, Options[Export]]
+				]
+			] @@@ {
+				{"wgx.css", WebGraphicsRuntimeStyle[]},
+				{"wgx-runtime.js", WebGraphicsRuntimeScript[]},
+				{"wgx-runtime-lib-2d.js", WebGraphics2DRuntimeScript[]},
+				{"wgx-runtime-lib-3d.js", WebGraphics3DRuntimeScript[]}
+			};
+			Internal`BagPart[fileBag, All]
 		]
-	]
+	];
 
 WebGraphicsRuntimeStyle[] := WebGraphicsRuntimeStyle[] = $wgxStyle;
 
@@ -76,6 +73,13 @@ WebGraphicsRuntimeScript[] :=
 	WebGraphicsRuntimeScript[] =
 		Import[
 			PacletObject["ToneAr/WebGraphics"]["AssetLocation", "wgx-runtime.js"],
+			"Text"
+		];
+
+WebGraphics2DInlineScript[] :=
+	WebGraphics2DInlineScript[] =
+		Import[
+			PacletObject["ToneAr/WebGraphics"]["AssetLocation", "wgx-lib-2d.js"],
 			"Text"
 		];
 
@@ -88,6 +92,13 @@ WebGraphics2DRuntimeScript[] :=
 			],
 			"Text"
 		]
+
+WebGraphics3DInlineScript[] :=
+	WebGraphics3DInlineScript[] =
+		Import[
+			PacletObject["ToneAr/WebGraphics"]["AssetLocation", "wgx-lib-3d.js"],
+			"Text"
+		];
 
 WebGraphics3DRuntimeScript[] :=
 	WebGraphics3DRuntimeScript[] =

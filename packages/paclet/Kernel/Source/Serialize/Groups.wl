@@ -100,6 +100,15 @@ serialize[Style[prim_, styles___], props_] :=
 	];
 serialize[gc_GraphicsComplex, props_] :=
 	serialize[First[Normal[Graphics[gc], GraphicsComplex]], props];
+serialize[Tooltip[StatusArea[inner_, ___], ttLabel_, ttRest___], props_] :=
+	(*
+	 * Charting` wraps every bar/wedge/bin as Tooltip[StatusArea[prim, v], v]:
+	 * the web tooltip already surfaces v near the cursor, so the StatusArea
+	 * would just duplicate it in the corner status sink.  Drop the redundant
+	 * StatusArea and keep the tooltip.  An explicit, standalone StatusArea
+	 * (no enclosing Tooltip) is unaffected and still renders to the sink.
+	 *)
+	serialize[Tooltip[inner, ttLabel, ttRest], props];
 serialize[Tooltip[expr_, label_, ___], props_] :=
 	(*
 	 * Tooltip[expr, label]: hover shows a styled box near the cursor.
@@ -166,6 +175,10 @@ serialize[Hyperlink[expr_, uri_, ___], props_] :=
 	];
 serialize[Hyperlink[uri : (_String | _URL), ___], props_] :=
 	serialize[Hyperlink[hrefStr[uri], uri], props];
+serialize[StatusArea[t_Tooltip, ___], props_] :=
+	(* Same Tooltip/StatusArea redundancy with the wrapping reversed: the tooltip
+	   already surfaces the label, so prefer it and drop the StatusArea. *)
+	serialize[t, props];
 serialize[StatusArea[expr_, label_, ___], props_] :=
 	(*
 	 * StatusArea[expr, label]: hover writes label into the status text.

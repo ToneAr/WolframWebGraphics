@@ -45,15 +45,15 @@ $wgxCurve = False;
 xmlTextEscape[s_String] :=
 	StringReplace[s, {"&" -> "&amp;", "<" -> "&lt;", ">" -> "&gt;"}];
 
-runtimeNodes[props_] :=
+(*
+ * Just the inlined runtime itself (styles + script).  The status sink
+ * (statusNode) is emitted separately by svgElement so it rides with the
+ * graphic whenever interactivity is present -- inline runtime or not.
+ *)
+runtimeNodes[] :=
 	{
 		XMLElement["style", {}, {XML`RawXML[xmlTextEscape[$wgxStyle]]}],
-		XMLElement[
-			"script",
-			{},
-			{XML`RawXML[xmlTextEscape[wgxSvgRuntimeScript[]]]}
-		],
-		statusNode[Lookup[props, "viewBox", Missing[]]]
+		XMLElement["script", {}, {XML`RawXML[xmlTextEscape[wgxSvgRuntimeScript[]]]}]
 	};
 
 statusNode[Missing[___]] :=

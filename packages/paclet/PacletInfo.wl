@@ -5,7 +5,7 @@ PacletObject[
 		"Description"    -> "Interactive Wolfram Web Graphics",
 		"Creator"        -> "Antonis Aristeidou",
 		"PublisherID"    -> "ToneAr",
-		"Version"        -> "0.6.0",
+		"Version"        -> "0.6.2",
 		"WolframVersion" -> "15+",
 		"PrimaryContext" -> "ToneAr`WebGraphics`",
 		"Extensions"     -> {

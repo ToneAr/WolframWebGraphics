@@ -8,6 +8,7 @@ export default tseslint.config(
 		ignores: [
 			"**/dist/**",
 			"**/build/**",
+			"**/paclet/**",
 			"**/node_modules/**",
 			"**/*.nb",
 			"**/*.vsnb",
