@@ -19,6 +19,35 @@ rasterData =
 		{x, 1, 48}
 	];
 
+checkerTexture =
+	Image[
+		Table[
+			If[EvenQ[Quotient[x, 8] + Quotient[y, 8]],
+				{0.08, 0.22, 0.72},
+				{0.96, 0.72, 0.18}
+			],
+			{y, 0, 63},
+			{x, 0, 63}
+		],
+		"Real"
+	];
+
+heightFieldData =
+	Table[0.35  Sin[x / 2] + 0.25  Cos[y / 3] + 0.04  x, {x, 0, 8}, {y, 0, 8}];
+
+surfacePointData =
+	Flatten[
+		Table[
+			{x, y, 0.45  Sin[x]  Cos[y] + 0.08  x  y},
+			{x, -2, 2, 0.5},
+			{y, -2, 2, 0.5}
+		],
+		1
+	];
+
+volumeData =
+	Table[Sin[x / 2] + Cos[y / 3] + (z - 3) / 4, {x, 0, 6}, {y, 0, 6}, {z, 0, 6}];
+
 boxWhiskerData =
 	Table[
 		Table[0.35  group + Sin[n / (2 + group)] + n / 24, {n, 1, 24}],
@@ -624,6 +653,83 @@ examples =
 			]
 		},
 		{
+			"ListPlot3D height field",
+			"ListPlot3D matrix data with ColorFunction-derived vertex colors.",
+			ListPlot3D[
+				heightFieldData,
+				Mesh          -> None,
+				ColorFunction -> "AvocadoColors",
+				ImageSize     -> 320
+			]
+		},
+		{
+			"ListSurfacePlot3D points",
+			"ListSurfacePlot3D triangulates sampled {x,y,z} point data.",
+			ListSurfacePlot3D[
+				surfacePointData,
+				Mesh          -> None,
+				ColorFunction -> "SolarColors",
+				ImageSize     -> 320
+			]
+		},
+		{
+			"Implicit surface",
+			"ContourPlot3D produces a polygon mesh for an implicit equation.",
+			ContourPlot3D[
+				x ^ 2 + y ^ 2 - z ^ 2 == 1,
+				{x, -1.7, 1.7},
+				{y, -1.7, 1.7},
+				{z, -1.5, 1.5},
+				Mesh         -> None,
+				PlotPoints   -> 15,
+				MaxRecursion -> 0,
+				ContourStyle -> Directive[
+					RGBColor[0.2, 0.55, 0.82],
+					Specularity[White, 25]
+				],
+				ImageSize    -> 320
+			]
+		},
+		{
+			"Boolean 3D region",
+			"RegionPlot3D exercises solid-region boundary extraction.",
+			RegionPlot3D[
+				x ^ 2 + y ^ 2 + z ^ 2 < 1 && z > x / 3,
+				{x, -1.1, 1.1},
+				{y, -1.1, 1.1},
+				{z, -1.1, 1.1},
+				Mesh         -> None,
+				MaxRecursion -> 0,
+				PlotStyle    -> Directive[
+					Opacity[0.72],
+					RGBColor[0.77, 0.35, 0.28],
+					Specularity[White, 20]
+				],
+				ImageSize    -> 320
+			]
+		},
+		{
+			"ListContourPlot3D volume",
+			"ListContourPlot3D extracts multiple surfaces from array data.",
+			ListContourPlot3D[
+				volumeData,
+				Contours  -> {-0.35, 0.35},
+				Mesh      -> None,
+				ImageSize -> 320
+			]
+		},
+		{
+			"DensityPlot3D volume",
+			"DensityPlot3D emits Raster3D volume data for WebGL rendering.",
+			DensityPlot3D[
+				Sin[2  x]  Cos[2  y] + 0.6  z,
+				{x, -1, 1},
+				{y, -1, 1},
+				{z, -1, 1},
+				ImageSize -> 320
+			]
+		},
+		{
 			"Explicit 3D polygons",
 			"Graphics3D with literal Polygon faces.",
 			Graphics3D[
@@ -634,6 +740,89 @@ examples =
 					Polygon[{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}]
 				},
 				ImageSize -> 300
+			]
+		},
+		{
+			"3D primitive gallery",
+			"Sphere, Cuboid, Cylinder, Cone and Tube serialized as WL meshes.",
+			Graphics3D[
+				{
+					Specularity[White, 30],
+					RGBColor[0.84, 0.28, 0.24],
+					Sphere[{-2.2, 0, 0}, 0.52],
+					RGBColor[0.22, 0.55, 0.84],
+					Cuboid[{-1.35, -0.5, -0.5}, {-0.35, 0.5, 0.5}],
+					RGBColor[0.18, 0.64, 0.38],
+					Cylinder[{{0.65, 0, -0.58}, {0.65, 0, 0.58}}, 0.36],
+					RGBColor[0.92, 0.62, 0.2],
+					Cone[{{1.75, 0, -0.58}, {1.75, 0, 0.62}}, 0.43],
+					RGBColor[0.64, 0.34, 0.76],
+					Tube[{{2.55, -0.55, -0.2}, {3.05, 0, 0.42}, {3.55, 0.55, -0.2}}, 0.13]
+				},
+				Boxed     -> False,
+				PlotRange -> {{-2.9, 3.9}, {-1.1, 1.1}, {-0.9, 0.9}},
+				ImageSize -> 360
+			]
+		},
+		{
+			"3D axes, box & grids",
+			"AxesLabel, AxesStyle, BoxStyle and FaceGrids in the WebGL widget.",
+			Graphics3D[
+				{
+					Opacity[0.92],
+					RGBColor[0.2, 0.48, 0.78],
+					Sphere[{0, 0, 0}, 0.62],
+					RGBColor[0.82, 0.32, 0.22],
+					Cylinder[{{-1.1, -1.1, -0.7}, {1.1, 1.1, 0.7}}, 0.18]
+				},
+				Axes      -> True,
+				AxesLabel -> {"x", "y", "z"},
+				AxesStyle -> {Red, Darker[Green], Blue},
+				BoxStyle  -> GrayLevel[0.35],
+				FaceGrids -> All,
+				ImageSize -> 340
+			]
+		},
+		{
+			"Textured 3D polygon",
+			"Texture plus VertexTextureCoordinates on a Graphics3D polygon.",
+			Graphics3D[
+				{
+					{
+						Texture[checkerTexture],
+						Polygon[
+							{{-1.4, -1.4, 0}, {1.4, -1.4, 0}, {1.4, 1.4, 0}, {-1.4, 1.4, 0}},
+							VertexTextureCoordinates -> {{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+						]
+					},
+					Specularity[White, 40],
+					RGBColor[0.72, 0.74, 0.78],
+					Sphere[{0, 0, 0.55}, 0.36]
+				},
+				Boxed     -> False,
+				ViewPoint -> {1.6, -2.4, 1.6},
+				ImageSize -> 320
+			]
+		},
+		{
+			"Viewer-relative lighting",
+			"Colored directional lights stay pinned to the camera while orbiting.",
+			Graphics3D[
+				{
+					Specularity[White, 45],
+					RGBColor[0.72, 0.72, 0.78],
+					Sphere[{0, 0, 0}, 1],
+					Glow[RGBColor[0.02, 0.02, 0.08]],
+					RGBColor[0.18, 0.72, 0.95],
+					Sphere[{1.18, 0.62, 0.38}, 0.22]
+				},
+				Lighting  -> {
+					{"Ambient", RGBColor[0.16, 0.16, 0.18]},
+					{"Directional", RGBColor[0.85, 0.22, 0.12], ImageScaled[{2, 0, 2}]},
+					{"Directional", RGBColor[0.12, 0.32, 0.95], ImageScaled[{0, 2, 2}]}
+				},
+				Boxed     -> False,
+				ImageSize -> 320
 			]
 		}
 	};

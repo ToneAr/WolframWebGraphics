@@ -52,36 +52,68 @@ serialize[g : Graphics3D[___]] :=
 	 * SymbolicXML for ExportString[#, "XML"]&.
 	 *)
 	Module[{
-			opts = Cases[Apply[List, g], _Rule | _RuleDelayed],
 			meshes,
+			lines,
+			volumes,
 			verts,
 			imageSize,
 			boundingBox,
 			viewPoint,
+			viewVertical,
+			viewAngle,
+			boxRatios,
+			plotRange,
 			elementID = uid["wgx3d"],
+			axesConfig,
+			sceneConfig,
 			sceneConfigJson
 		},
 		meshes = graphics3DMeshes[g];
-		verts = allVertices3D[g];
-		imageSize = size3D[opts];
+		lines = graphics3DLines[g];
+		volumes = graphics3DVolumes[g];
+		verts =
+			Join[
+				allMeshVertices3D[meshes],
+				allLineVertices3D[lines],
+				allVolumeVertices3D[volumes]
+			];
+		imageSize = size3D[g];
 		boundingBox =
 			If[verts === {},
 				{-1., 1., -1., 1., -1., 1.},
 				Flatten[MinMax /@ Transpose[verts]]
 			];
 		viewPoint = viewPoint3D[g];
+		viewVertical = viewVertical3D[g];
+		viewAngle = viewAngle3D[g];
+		boxRatios = boxRatios3D[g];
+		plotRange = plotRange3D[g];
+		axesConfig = axes3D[g];
+		sceneConfig =
+			<|
+				"width" -> imageSize[[1]],
+				"height" -> imageSize[[2]],
+				"meshes" -> meshes,
+				"lines" -> lines,
+				"volumes" -> volumes,
+				"bbox" -> boundingBox,
+				(* the box BoxRatios shapes; fall back to the geometry bounds when
+				   AbsoluteOptions can't resolve a numeric range *)
+				"plotRange" -> If[MissingQ[plotRange], boundingBox, plotRange],
+				"vp" -> viewPoint,
+				"vv" -> viewVertical,
+				"boxRatios" -> boxRatios,
+				"lights" -> lights3D[g, boundingBox]
+			|>;
+		If[NumericQ[viewAngle],
+			sceneConfig["va"] = viewAngle
+		];
+		(* axes3D returns Missing when there is nothing to draw -- omit the key *)
+		If[!MissingQ[axesConfig],
+			sceneConfig["axes"] = axesConfig
+		];
 		sceneConfigJson =
-			ExportString[
-				<|
-					"width" -> imageSize[[1]],
-					"height" -> imageSize[[2]],
-					"meshes" -> meshes,
-					"bbox" -> boundingBox,
-					"vp" -> viewPoint
-				|>,
-				"RawJSON",
-				"Compact" -> True
-			];
+			ExportString[sceneConfig, "RawJSON", "Compact" -> True];
 		XMLTemplate[
 			"<div
 				id=\"`elId`\"

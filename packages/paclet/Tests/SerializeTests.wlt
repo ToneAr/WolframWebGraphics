@@ -2253,6 +2253,694 @@ TestCreate[
 	True,
 	TestID -> "graphics3d-texture-uv-json"
 ];
+
+v3[g_] := pvt`graphics3DVolumes[g];
+raster3DPrimitive =
+	Raster3D[
+		{
+			{{0., 0.25}, {0.5, 0.75}},
+			{{1., 0.75}, {0.5, 0.25}}
+		},
+		{{-1., -2., -3.}, {1., 2., 3.}},
+		ColorFunction -> (RGBColor[#, 0, 1 - #, #]&),
+		Method -> {"InterpolateValues" -> True}
+	];
+
+TestCreate[
+	With[{vol = First[v3[Graphics3D[raster3DPrimitive]]]},
+		vol["dims"] === {2, 2, 2} &&
+		vol["bbox"] === {-1., 1., -2., 2., -3., 3.} &&
+		TrueQ[vol["interpolate"]] &&
+		Length[Normal[BaseDecode[vol["data"]]]] === 4  Times @@ vol["dims"]
+	],
+	True,
+	TestID -> "raster3d-volume-config"
+];
+TestCreate[
+	With[{
+			vol =
+				First[
+					v3[
+						Graphics3D[
+							{
+								Opacity[0.5],
+								Raster3D[
+									{{{1.}}},
+									ColorFunction -> (RGBColor[1, 0, 0, #]&)
+								]
+							}
+						]
+					]
+				]
+		},
+		Partition[Normal[BaseDecode[vol["data"]]], 4][[1]] === {255, 0, 0, 128}
+	],
+	True,
+	TestID -> "raster3d-style-opacity"
+];
+TestCreate[
+	With[{
+			vol =
+				First[
+					v3[
+						DensityPlot3D[
+							x + 2  y + 4  z,
+							{x, 0, 1},
+							{y, 0, 1},
+							{z, 0, 1},
+							PlotPoints -> 3
+						]
+					]
+				]
+			},
+			vol["dims"] === {3, 3, 3} &&
+			vol["bbox"] === {0., 1., 0., 1., 0., 1.} &&
+			Length[Normal[BaseDecode[vol["data"]]]] === 4  Times @@ vol["dims"]
+	],
+	True,
+	TestID -> "densityplot3d-raster3d-volume"
+];
+TestCreate[
+	Function[
+		pp,
+		First[
+			v3[
+				DensityPlot3D[
+					x + 2  y + 4  z,
+					{x, 0, 1},
+					{y, 0, 1},
+					{z, 0, 1},
+					PlotPoints -> pp
+				]
+			]
+		]["dims"]
+	] /@ {3, 5},
+	{{3, 3, 3}, {5, 5, 5}},
+	TestID -> "densityplot3d-plotpoints-preserve-volume-resolution"
+];
+TestCreate[
+	StringContainsQ[
+		pvt`serialize[
+			DensityPlot3D[
+				x + y + z,
+				{x, 0, 1},
+				{y, 0, 1},
+				{z, 0, 1},
+				PlotPoints -> 3
+			]
+		],
+		"\"dims\":[3,3,3]"
+	],
+	True,
+	TestID -> "raster3d-volume-json-preserves-dims"
+];
+
+(* ::Subsection:: *) (* 3D axes inferred from Graphics3D options *)
+(* Everything below is resolved from the actual options via AbsoluteOptions --
+   nothing (colors, labels, ticks) is invented by the runtime. *)
+ax3[g_] := pvt`axes3D[g];
+
+(* per-axis on/off from Axes *)
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> True]]["show"],
+	{True, True, True},
+	TestID -> "axes3d-show-true"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> {True, False, True}]]["show"],
+	{True, False, True},
+	TestID -> "axes3d-show-per-axis"
+];
+
+(* nothing to draw (axes off, box off, no grids) -> Missing, so the scene
+   config omits the "axes" key entirely *)
+TestCreate[
+	MissingQ[ax3[Graphics3D[Sphere[], Axes -> False, Boxed -> False]]],
+	True,
+	TestID -> "axes3d-omitted-when-empty"
+];
+
+(* the box: Boxed default True for plain Graphics3D; color from BoxStyle *)
+TestCreate[
+	ax3[Graphics3D[Sphere[]]]["box"]["show"],
+	True,
+	TestID -> "axes3d-default-box-on"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[]]]["box"]["color"],
+	"#000000",
+	TestID -> "axes3d-default-box-black"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[], BoxStyle -> Red]]["box"]["color"],
+	"#ff0000",
+	TestID -> "axes3d-box-style-color"
+];
+
+(* axis line colors from AxesStyle; default is MMA's own black, not invented *)
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> True, AxesStyle -> {Red, Green, Blue}]]["colors"],
+	{"#ff0000", "#00ff00", "#0000ff"},
+	TestID -> "axes3d-colors-from-axesstyle"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> True]]["colors"],
+	{"#000000", "#000000", "#000000"},
+	TestID -> "axes3d-colors-default-black"
+];
+
+(* labels from AxesLabel (FormBox stripped); None -> Null *)
+TestCreate[
+	#["text"]& /@ ax3[Graphics3D[Sphere[], Axes -> True, AxesLabel -> {"x", "y", "z"}]]["labels"],
+	{"x", "y", "z"},
+	TestID -> "axes3d-labels-text"
+];
+TestCreate[
+	ax3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]]["labels"],
+	{Null, Null, Null},
+	TestID -> "axes3d-labels-none"
+];
+(* Plot3D wraps AxesLabel strings in FormBox[TagBox[..., HoldForm], ...],
+   unlike plain Graphics3D's FormBox["x"] -- both must reduce to plain text *)
+TestCreate[
+	#["text"]& /@ ax3[
+		Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}, AxesLabel -> {"x", "y", "z"}]
+	]["labels"],
+	{"x", "y", "z"},
+	TestID -> "axes3d-labels-plot3d-text"
+];
+
+(* ticks resolved to numeric positions + the kernel's own label strings *)
+TestCreate[
+	Length[ax3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]]["ticks"][[1]]] > 0,
+	True,
+	TestID -> "axes3d-ticks-nonempty"
+];
+TestCreate[
+	FirstCase[
+		ax3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]]["ticks"][[1]],
+		t_ /; t["value"] == 0. :> t["label"]
+	],
+	"0.0",
+	TestID -> "axes3d-ticks-zero-label"
+];
+TestCreate[
+	MemberQ[
+		#["label"]& /@ ax3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]]["ticks"][[1]],
+		""
+	],
+	True,
+	TestID -> "axes3d-ticks-minor-empty"
+];
+
+(* tick-label colours are per-axis: each axis's ticks take that axis's font
+   colour (MMA colours y-ticks green when AxesStyle y is green), not a single
+   shared colour *)
+TestCreate[
+	#["color"]& /@ ax3[
+		Graphics3D[Sphere[], Axes -> True, AxesStyle -> {Red, Green, Blue}]
+	]["tickStyles"],
+	{"#ff0000", "#00ff00", "#0000ff"},
+	TestID -> "axes3d-tickstyles-per-axis"
+];
+
+(* AxesEdge: Automatic -> dynamic (Null); explicit edge specs honored *)
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> True]]["edges"],
+	{Null, Null, Null},
+	TestID -> "axes3d-edges-dynamic"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[], Axes -> True, AxesEdge -> {{-1, -1}, {1, -1}, {-1, 1}}]]["edges"],
+	{{-1, -1}, {1, -1}, {-1, 1}},
+	TestID -> "axes3d-edges-explicit"
+];
+
+(* FaceGrids: All -> 6 faces; None (default) -> no faces *)
+TestCreate[
+	Length[ax3[Graphics3D[Sphere[], FaceGrids -> All]]["faceGrids"]["faces"]],
+	6,
+	TestID -> "axes3d-facegrids-all"
+];
+TestCreate[
+	ax3[Graphics3D[Sphere[]]]["faceGrids"]["faces"],
+	{},
+	TestID -> "axes3d-facegrids-none"
+];
+
+(* end-to-end: the resolved axes block is present in the serialized scene JSON *)
+TestCreate[
+	StringContainsQ[
+		pvt`serialize[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]],
+		"\"axes\":"
+	],
+	True,
+	TestID -> "axes3d-json-emitted"
+];
+
+(* ::Subsection:: *) (* 3D mesh lines and box ratios from Graphics3D data *)
+l3[g_] := pvt`graphics3DLines[g];
+
+TestCreate[
+	With[{sz = pvt`size3D[Plot3D[Sin[x]  Cos[y], {x, 0, 10}, {y, 0, 10}]]},
+		MatchQ[sz, {_?NumericQ, _?NumericQ}] && sz[[1]] != sz[[2]]
+	],
+	True,
+	TestID -> "graphics3d-size-from-absolute-options"
+];
+TestCreate[
+	pvt`boxRatios3D[Plot3D[Sin[x]  Cos[y], {x, 0, 10}, {y, 0, 10}]],
+	{1., 1., 0.4},
+	TestID -> "graphics3d-boxratios-from-absolute-options"
+];
+(* the plot range (the box BoxRatios shapes) is the resolved numeric range, not
+   the tight geometry bounds: an explicit PlotRange wider than the geometry must
+   reach the runtime verbatim so the contents aren't anisotropically stretched *)
+TestCreate[
+	pvt`plotRange3D[
+		Graphics3D[
+			Cylinder[{{0, 0, -0.58}, {0, 0, 0.58}}, 0.36],
+			PlotRange -> {{-2.9, 3.9}, {-1.1, 1.1}, {-0.9, 0.9}}
+		]
+	],
+	{-2.9, 3.9, -1.1, 1.1, -0.9, 0.9},
+	TestID -> "graphics3d-plotrange-from-absolute-options"
+];
+TestCreate[
+	StringContainsQ[
+		pvt`serialize[
+			Graphics3D[
+				Cylinder[{{0, 0, -0.58}, {0, 0, 0.58}}, 0.36],
+				PlotRange -> {{-2.9, 3.9}, {-1.1, 1.1}, {-0.9, 0.9}}
+			]
+		],
+		"\"plotRange\":[-2.9,3.9,-1.1,1.1,-0.9,0.9]"
+	],
+	True,
+	TestID -> "graphics3d-plotrange-json"
+];
+TestCreate[
+	With[{g = Plot3D[Sin[x]  Cos[y], {x, 0, 10}, {y, 0, 10}]},
+		Length[l3[g]] === Length[Cases[First[g], _Line, Infinity]] &&
+			Length[l3[g]] > 0
+	],
+	True,
+	TestID -> "graphics3d-lines-from-expression"
+];
+TestCreate[
+	MemberQ[
+		#["color"]& /@
+			l3[
+				Plot3D[
+					Sin[x]  Cos[y],
+					{x, 0, 10},
+					{y, 0, 10},
+					MeshStyle -> Red
+				]
+			],
+		{1., 0., 0.}
+	],
+	True,
+	TestID -> "graphics3d-lines-meshstyle-color"
+];
+TestCreate[
+	With[{g = Plot3D[Sin[x]  Cos[y], {x, 0, 10}, {y, 0, 10}, Mesh -> None]},
+		Length[l3[g]] === Length[Cases[First[g], _Line, Infinity]]
+	],
+	True,
+	TestID -> "graphics3d-lines-mesh-none"
+];
+TestCreate[
+	With[{doc = pvt`serialize[Plot3D[Sin[x]  Cos[y], {x, 0, 10}, {y, 0, 10}]]},
+		StringContainsQ[doc, "lines"] &&
+			StringContainsQ[doc, "boxRatios"]
+	],
+	True,
+	TestID -> "graphics3d-lines-boxratios-json"
+];
+
+(* ::Subsection:: *) (* 3D materials derived from directives (no hardcoding) *)
+m3[g_] := pvt`graphics3DMeshes[g];
+tri1 = Polygon[{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}];
+tri2 = Polygon[{{0, 0, 1}, {1, 0, 1}, {0, 1, 1}}];
+
+primitive3DPrimitives = {
+	Sphere[],
+	Cuboid[],
+	Cylinder[],
+	Cone[],
+	Tube[{{0, 0, 0}, {1, 0, 0}}]
+};
+
+TestCreate[
+	AllTrue[
+		primitive3DPrimitives,
+		Function[
+			p,
+			With[{mesh = First[m3[Graphics3D[p]]]},
+				Length[mesh["pos"]] > 0 && Length[mesh["idx"]] > 0
+			]
+		]
+	],
+	True,
+	TestID -> "mesh3d-primitive-surfaces"
+];
+TestCreate[
+	#["color"]& /@ m3[Graphics3D[{Red, Sphere[], Blue, Cuboid[]}]],
+	{{1., 0., 0.}, {0., 0., 1.}},
+	TestID -> "mesh3d-primitive-directive-colors"
+];
+TestCreate[
+	With[{
+			meshes =
+				m3[
+					Graphics3D[
+						GraphicsComplex[
+							{{0, 0, 0}, {1, 0, 0}, {0.5, 0.8, 0}, {0.5, 0, 0}},
+							{
+								{{Red, Sphere[{1, 2}, 0.12]}, {Blue, Sphere[{3}, 0.1]}},
+								{{Gray, Cylinder[{1, 4}, 0.04]}, {Gray, Cylinder[{4, 2}, 0.04]}}
+							}
+						]
+					]
+				]
+		},
+		Length[meshes] === 4 &&
+		AllTrue[meshes, Length[#["pos"]] > 0 && Length[#["idx"]] > 0&]
+	],
+	True,
+	TestID -> "mesh3d-graphicscomplex-indexed-primitives"
+];
+TestCreate[
+	With[{
+			meshes =
+				m3[
+					Graphics3D[
+						GraphicsComplex[
+							{{0, 0, 0}, {1, 0, 0}, {0.5, 0.8, 0}, {0.5, 0, 0}},
+							{
+								{{Red, Sphere[{1, 2}, 0.12]}, {Blue, Sphere[{3}, 0.1]}},
+								{{Gray, Cylinder[{1, 4}, 0.04]}, {Gray, Cylinder[{4, 2}, 0.04]}}
+							}
+						]
+					]
+				]
+		},
+		#["color"]& /@ meshes
+	],
+	{{1., 0., 0.}, {0., 0., 1.}, {0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+	TestID -> "mesh3d-graphicscomplex-primitive-colors"
+];
+TestCreate[
+	With[{
+			verts =
+				pvt`allMeshVertices3D[
+					m3[Graphics3D[Sphere[{5, 0, 0}, 2]]]
+				]
+		},
+		With[{bbox = Flatten[MinMax /@ Transpose[verts]]},
+			2.9 < bbox[[1]] < 3.1 && 6.9 < bbox[[2]] < 7.1
+		]
+	],
+	True,
+	TestID -> "mesh3d-primitive-bounds-from-mesh"
+];
+
+(* a directive colour applies to the primitives that follow it *)
+TestCreate[
+	m3[Graphics3D[{Red, tri1}]][[1]]["color"],
+	{1., 0., 0.},
+	TestID -> "mesh3d-directive-color"
+];
+(* {Red, A, Blue, B} -> two meshes, two colours, in source order *)
+TestCreate[
+	#["color"]& /@ m3[Graphics3D[{Red, tri1, Blue, tri2}]],
+	{{1., 0., 0.}, {0., 0., 1.}},
+	TestID -> "mesh3d-per-primitive-colors"
+];
+(* Opacity directive *)
+TestCreate[
+	m3[Graphics3D[{Opacity[0.5], Red, tri1}]][[1]]["opacity"],
+	0.5,
+	TestID -> "mesh3d-opacity"
+];
+(* a colour carrying its own alpha sets opacity too *)
+TestCreate[
+	m3[Graphics3D[{RGBColor[1, 0, 0, 0.25], tri1}]][[1]]["opacity"],
+	0.25,
+	TestID -> "mesh3d-color-alpha-opacity"
+];
+(* Specularity[colour, exponent] -> specular colour + shininess *)
+TestCreate[
+	{#["specular"], #["shininess"]}& @ m3[Graphics3D[{Specularity[Red, 20], tri1}]][[1]],
+	{{1., 0., 0.}, 20.},
+	TestID -> "mesh3d-specularity"
+];
+(* Glow -> emissive colour *)
+TestCreate[
+	m3[Graphics3D[{Glow[Green], tri1}]][[1]]["emissive"],
+	{0., 1., 0.},
+	TestID -> "mesh3d-glow"
+];
+(* VertexColors still win as per-vertex colour (ColorFunction path) *)
+TestCreate[
+	ListQ[m3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}, ColorFunction -> Hue]][[1]]["col"]],
+	True,
+	TestID -> "mesh3d-vertexcolors-per-vertex"
+];
+(* NOTHING HARDCODED: Plot3D bakes its own gold default colour into the
+   GraphicsComplex directive, which we extract; what we must NOT do is invent a
+   per-vertex height palette -- so col is Null and color is the real directive *)
+TestCreate[
+	With[{mesh = m3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]][[1]]},
+		mesh["col"] === Null && MatchQ[mesh["color"], {_?NumericQ, _?NumericQ, _?NumericQ}]
+	],
+	True,
+	TestID -> "mesh3d-no-invented-color"
+];
+(* a literal polygon with no directive likewise has no colour *)
+TestCreate[
+	m3[Graphics3D[tri1]][[1]]["color"],
+	Null,
+	TestID -> "mesh3d-literal-no-color"
+];
+(* texture extraction unchanged: textured polygon keeps tex+uv, no colour *)
+TestCreate[
+	With[{mesh = m3[texture3D][[1]]},
+		StringStartsQ[mesh["tex"], "data:image/png;base64,"] &&
+		mesh["uv"] === {0., 0., 1., 0., 1., 1., 0., 0., 1., 1., 0., 1.} &&
+		mesh["color"] === Null
+	],
+	True,
+	TestID -> "mesh3d-texture-intact"
+];
+
+(* ::Subsection:: *) (* 3D polygon edges (EdgeForm) *)
+(* Wolfram draws a thin black border on every polygon / mesh primitive by
+   default (the runtime computes the feature edges; we resolve their style).
+   The default colour is the kernel's own black, not invented. *)
+TestCreate[
+	m3[Graphics3D[Cuboid[]]][[1]]["edge"]["color"],
+	{0., 0., 0.},
+	TestID -> "edge3d-primitive-default-black"
+];
+TestCreate[
+	m3[Graphics3D[tri1]][[1]]["edge"]["color"],
+	{0., 0., 0.},
+	TestID -> "edge3d-literal-default-black"
+];
+(* EdgeForm[None] turns the border off -> no edge style emitted *)
+TestCreate[
+	m3[Graphics3D[{EdgeForm[None], tri1}]][[1]]["edge"],
+	Null,
+	TestID -> "edge3d-edgeform-none-off"
+];
+(* EdgeForm[] (empty) also turns it off -- this is what Plot3D bakes in *)
+TestCreate[
+	m3[Graphics3D[{EdgeForm[], tri1}]][[1]]["edge"],
+	Null,
+	TestID -> "edge3d-edgeform-empty-off"
+];
+(* EdgeForm[colour] sets the border colour *)
+TestCreate[
+	m3[Graphics3D[{EdgeForm[Red], tri1}]][[1]]["edge"]["color"],
+	{1., 0., 0.},
+	TestID -> "edge3d-edgeform-color"
+];
+(* EdgeForm carrying nested directives resolves colour + thickness + opacity *)
+TestCreate[
+	With[{
+			edge =
+				m3[
+					Graphics3D[
+						{EdgeForm[Directive[Blue, Thickness[0.01], Opacity[0.4]]], tri1}
+					]
+				][[1]]["edge"]
+		},
+		{edge["color"], edge["width"], edge["opacity"]}
+	],
+	{{0., 0., 1.}, 0.01, 0.4},
+	TestID -> "edge3d-edgeform-thickness-opacity"
+];
+(* EdgeForm is lexically scoped like any directive: off before tri1, red before
+   tri2 -- and the differing edge keeps them in separate meshes *)
+TestCreate[
+	With[{
+			edges = #["edge"]& /@ m3[Graphics3D[{EdgeForm[None], tri1, EdgeForm[Red], tri2}]]
+		},
+		{edges[[1]], edges[[2]]["color"]}
+	],
+	{Null, {1., 0., 0.}},
+	TestID -> "edge3d-edgeform-scoping"
+];
+(* Plot3D bakes EdgeForm[] in front of its surface polygons, so the surface mesh
+   gets no border (its visible grid is separate Mesh lines, on the line path) *)
+TestCreate[
+	m3[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]][[1]]["edge"],
+	Null,
+	TestID -> "edge3d-plot3d-surface-off"
+];
+
+(* Cap-bearing curved primitives get exact analytic rim polylines (a dihedral
+   threshold on the coarse mesh can't tell a thin cylinder's facets from its
+   caps). A cylinder -> its two rim circles; each closed, at the true radius. *)
+TestCreate[
+	With[{
+			paths = m3[Graphics3D[Cylinder[{{0, 0, -1}, {0, 0, 1}}, 0.5]]][[1]]["edgePaths"]
+		},
+		Length[paths] === 2 &&
+		AllTrue[
+			paths,
+			Function[
+				p,
+				With[{pts = Partition[p, 3]},
+					First[pts] === Last[pts] &&
+					AllTrue[pts, Abs[Norm[#[[1 ;; 2]]] - 0.5] < 0.01&]
+				]
+			]
+		]
+	],
+	True,
+	TestID -> "edge3d-cylinder-analytic-rims"
+];
+(* a cone -> just its base circle (radius r, at the base end) *)
+TestCreate[
+	With[{
+			paths = m3[Graphics3D[Cone[{{0, 0, 0}, {0, 0, 2}}, 0.4]]][[1]]["edgePaths"]
+		},
+		Length[paths] === 1 &&
+		With[{pts = Partition[paths[[1]], 3]},
+			First[pts] === Last[pts] &&
+			AllTrue[pts, Abs[Norm[#[[1 ;; 2]]] - 0.4] < 0.01&] &&
+			AllTrue[pts, Abs[#[[3]]] < 0.01&]
+		]
+	],
+	True,
+	TestID -> "edge3d-cone-analytic-base"
+];
+(* the analytic rims respect a non-axis-aligned cylinder *)
+TestCreate[
+	Length[m3[Graphics3D[Cylinder[{{-1, -1, 0}, {1, 1, 0}}, 0.3]]][[1]]["edgePaths"]],
+	2,
+	TestID -> "edge3d-cylinder-analytic-rims-diagonal"
+];
+(* flat-faced and smooth primitives carry NO analytic paths -- EdgesGeometry is
+   exact for the cube's edges and gives nothing for the smooth sphere *)
+TestCreate[
+	KeyExistsQ[m3[Graphics3D[Cuboid[]]][[1]], "edgePaths"],
+	False,
+	TestID -> "edge3d-cuboid-no-edgepaths"
+];
+TestCreate[
+	KeyExistsQ[m3[Graphics3D[Sphere[]]][[1]], "edgePaths"],
+	False,
+	TestID -> "edge3d-sphere-no-edgepaths"
+];
+
+(* ::Subsection:: *) (* 3D lighting derived from the Lighting option *)
+lt[g_] := pvt`lights3D[g, {-1., 1., -1., 1., -1., 1.}];
+
+(* default Graphics3D lighting is the colored "Standard" set: ambient + dirs *)
+TestCreate[
+	lt[Graphics3D[Sphere[]]][[1]]["type"],
+	"ambient",
+	TestID -> "lights3d-default-has-ambient"
+];
+TestCreate[
+	Length[lt[Graphics3D[Sphere[]]]] >= 4,
+	True,
+	TestID -> "lights3d-default-count"
+];
+(* Neutral lighting -> gray ambient *)
+TestCreate[
+	FirstCase[
+		lt[Graphics3D[Sphere[], Lighting -> "Neutral"]],
+		a_ /; a["type"] === "ambient" :> a["color"]
+	],
+	{0.35, 0.35, 0.35},
+	TestID -> "lights3d-neutral-ambient"
+];
+(* Lighting -> None *)
+TestCreate[
+	lt[Graphics3D[Sphere[], Lighting -> None]],
+	{},
+	TestID -> "lights3d-none"
+];
+(* Plot3D bakes its own warm gold-tinted lighting into the surface's
+   GraphicsComplex directive; the top-level Lighting is Automatic, which
+   resolves to the generic colored Standard set. The resolved scene lighting
+   must use the baked gold ambient, not the generic {0.4, 0.2, 0.2}. *)
+TestCreate[
+	FirstCase[
+		lt[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]],
+		a_ /; a["type"] === "ambient" :> a["color"]
+	],
+	{0.301, 0.2241, 0.0905},
+	TestID -> "lights3d-plot3d-baked-gold-ambient"
+];
+(* an explicit Lighting on the plot still wins over any baked directive *)
+TestCreate[
+	FirstCase[
+		lt[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}, Lighting -> "Neutral"]],
+		a_ /; a["type"] === "ambient" :> a["color"]
+	],
+	{0.35, 0.35, 0.35},
+	TestID -> "lights3d-plot3d-explicit-lighting-wins"
+];
+(* ImageScaled lights are view-space (pinned to the viewer): tagged view -> True
+   with a position recentred on the box centre, NOT mapped through the bbox.
+   Reading them as world points mis-orients the default directionals and makes
+   plot surfaces far too dark. *)
+TestCreate[
+	FirstCase[
+		lt[Graphics3D[Sphere[],
+			Lighting -> {{"Directional", White, ImageScaled[{0, 2, 2}]}}]],
+		d_ /; d["type"] === "directional" :> {TrueQ[d["view"]], d["position"]}
+	],
+	{True, {-0.5, 1.5, 1.5}},
+	TestID -> "lights3d-imagescaled-is-view-space"
+];
+(* absolute world coords stay world-space: no view flag, position passed through *)
+TestCreate[
+	FirstCase[
+		lt[Graphics3D[Sphere[],
+			Lighting -> {{"Directional", White, {1., 2., 3.}}}]],
+		d_ /; d["type"] === "directional" :>
+			{KeyExistsQ[d, "view"], d["position"]}
+	],
+	{False, {1., 2., 3.}},
+	TestID -> "lights3d-absolute-is-world-space"
+];
+(* end-to-end: the resolved lights block is in the serialized scene JSON *)
+TestCreate[
+	StringContainsQ[
+		pvt`serialize[Plot3D[Sin[x  y], {x, 0, 2}, {y, 0, 2}]],
+		"\"lights\":"
+	],
+	True,
+	TestID -> "lights3d-json-emitted"
+];
+
 ToneAr`WebGraphics`PackageScope`$wgxInlineRuntime = True;
 
 (* ::Section:: *) (* Dynamics *)

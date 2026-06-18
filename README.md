@@ -328,5 +328,5 @@ you can host or inline them yourself:
   ```
 - **Full `Graphics3D` support** - Extended 3D support of more primitives and
   Options.
-- **Full Dynamic Support** - Full support for `Dynamic` constructs including
-  `Manipulate` by re-binding dynamic variables in JS.
+- **Limited Dynamic Support** - Some support for `Dynamic` constructs including
+  `Manipulate` by re-binding simple dynamic variables in JS.

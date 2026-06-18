@@ -22,6 +22,7 @@
 	},
 	"scripts": {
 		"dev": "bunx --bun vite",
+		"test": "bun test",
 		"build": "tsc && bunx --bun vite build && WGX_BUILD=inline bunx --bun vite build",
 		"preview": "bunx --bun vite preview",
 		"typecheck": "tsc"

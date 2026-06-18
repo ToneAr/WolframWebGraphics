@@ -10,6 +10,11 @@ export default tseslint.config(
 			"**/build/**",
 			"**/paclet/**",
 			"**/node_modules/**",
+			// Bun test files run under `bun test` (their own types) and are
+			// excluded from the tsc project, so type-aware linting can't resolve
+			// them via the project service.
+			"**/*.test.ts",
+			"**/*.test.tsx",
 			"**/*.nb",
 			"**/*.vsnb",
 			"**/*.wl",

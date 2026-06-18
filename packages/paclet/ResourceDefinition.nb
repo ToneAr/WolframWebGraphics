@@ -3137,7 +3137,7 @@ Cell[BoxData[{
   ";"}]}], "Input", "Excluded",
  TaggingRules->{},
  InitializationCell->True,
- CellLabel->"In[28]:=",
+ CellLabel->"In[10]:=",
  CellID->264453224,ExpressionUUID->"362d4ad2-6f63-4fb9-bd1e-6dcd52a95324"]
 }, Open  ]],
 
@@ -40417,8 +40417,8 @@ Cell["Additional information about limitations, issues, etc.", "Text",
 }, Open  ]]
 }, Open  ]]
 },
-WindowSize->{715.5, 1036.5},
-WindowMargins->{{Automatic, 7.5}, {7.5, 36}},
+WindowSize->{531.75, 1036.5},
+WindowMargins->{{Automatic, 7.5}, {7.5, -369.75}},
 WindowTitle->"WebGraphics | Definition Notebook",
 DockedCells->{
   Cell[

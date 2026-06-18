@@ -132,12 +132,6 @@ serialize[Tooltip[expr_, label_, ___], props_] :=
 							target,
 							{
 								"data-wgx-tooltip-id" -> id
-								(*
-								(* DONE *)
-								"onmouseover" -> StringJoin[ "wgxShowTooltip(evt,'", id, "')"],
-								"onmousemove" -> "wgxMoveTooltip(evt)",
-								"onmouseout" -> "wgxHideTooltip()"
-								*)
 							}
 						],
 						XMLElement[
@@ -196,16 +190,6 @@ serialize[StatusArea[expr_, label_, ___], props_] :=
 					{
 						"data-wgx-status-id" -> uid["status"],
 						"data-wgx-status-text" -> If[StringQ[label], label, ToString[label]]
-						(*
-						(* DONE *)
-						"onmouseover" ->
-							StringJoin[
-								"wgxSetStatus(evt,'",
-								jsEsc[If[StringQ[label], label, ToString[label]]],
-								"')"
-							],
-						"onmouseout" -> "wgxClearStatus(evt)"
-						*)
 					},
 					{inner}
 				]

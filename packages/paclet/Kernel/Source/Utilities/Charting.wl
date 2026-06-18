@@ -149,23 +149,9 @@ chartEffectMatrixString[{_, tf_, ___}] :=
 chartEffectAttrs["hover", eff_] :=
 	Which[
 		chartStyleEffectQ[eff],
-			{
-				"data-wgx-hover" -> hoverEffectStyle[eff]
-				(*
-				(* DONE *)
-				"onmouseover"    -> "wgxHoverOn(evt)",
-				"onmouseout"     -> "wgxHoverOff(evt)"
-				*)
-			},
+			{"data-wgx-hover" -> hoverEffectStyle[eff]},
 		chartTransformEffectQ[eff],
-			{
-				"data-wgx-hover-transform" -> chartEffectMatrixString[eff]
-				(*
-				(* DONE *)
-				"onmouseover"              -> "wgxHoverOn(evt)",
-				"onmouseout"               -> "wgxHoverOff(evt)"
-				*)
-			},
+			{"data-wgx-hover-transform" -> chartEffectMatrixString[eff]},
 		True,
 			{}
 	];
@@ -174,20 +160,12 @@ chartEffectAttrs["click", eff_] :=
 		chartTransformEffectQ[eff],
 			{
 				"data-wgx-click" -> chartEffectMatrixString[eff],
-				(*
-				(* DONE *)
-				"onclick" -> "wgxClickToggle(evt)",
-				*)
-				"style" -> "cursor:pointer"
+				"style"          -> "cursor:pointer"
 			},
 		chartStyleEffectQ[eff],
 			{
 				"data-wgx-click-style" -> hoverEffectStyle[eff],
-				(*
-				(* DONE *)
-				"onclick"              -> "wgxClickToggle(evt)",
-				*)
-				"style" -> "cursor:pointer"
+				"style"                -> "cursor:pointer"
 			},
 		True,
 			{}
