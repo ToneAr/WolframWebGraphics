@@ -19,20 +19,10 @@ const LIGHT_INTENSITY = Math.PI;
 
 const CAMERA_FIT_MARGIN = 1;
 
-const WOLFRAM_SPECULAR_SCALE = 0.4 / LIGHT_INTENSITY;
+const WOLFRAM_SPECULAR_SCALE = 0.35 / LIGHT_INTENSITY;
 
 // Dihedral angle (degrees) above which a shared polygon edge counts as a feature
-// edge worth drawing -- and, in createMeshGeometry, a crease worth shading hard
-// (so a flat cap stays flat instead of being smoothed into a dome). Wolfram
-// borders the hard edges of a primitive but not its
-// smooth tessellation -- and crucially the discretiser tessellates a curved
-// surface more coarsely the thinner the primitive is, so a thin cylinder's
-// lateral facets can reach ~30deg (and grow further as r shrinks). This sits in
-// the gap between those smooth facets and every true geometric feature: cap rims
-// and cube edges are 90deg, cone bases ~110deg, and the shallowest polyhedron
-// edge (a triangular prism / tetrahedron) is ~60-70deg. 45deg merges the smooth
-// facets -- so cylinders / cones / spheres stay smooth like Wolfram -- while
-// keeping every real edge.
+// edge worth drawing
 const EDGE_THRESHOLD_DEG = 45;
 
 // Wolfram colour values are display (sRGB) values; render them at face value

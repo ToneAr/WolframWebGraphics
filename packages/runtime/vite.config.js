@@ -94,6 +94,10 @@ export default defineConfig({
 			output: {
 				entryFileNames: "[name].js",
 				chunkFileNames: "[name].js",
+				// Inline bundles run as classic scripts, so isolate Rollup's
+				// top-level vars from other inline runtime bundles on the page.
+				intro: isInline ? "(() => {" : undefined,
+				outro: isInline ? "})();" : undefined,
 			},
 		},
 		sourcemap: false,

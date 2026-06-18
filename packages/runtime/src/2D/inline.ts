@@ -17,14 +17,19 @@ import SVGRuntime from "./SVGRuntime";
  */
 function boot(): void {
 	const runtime = new SVGRuntime(document);
-	runtime.populate();
+	runtime.populate().catch((e) => console.error(e));
 	for (const svg of runtime.elements) {
 		runtime.initializeCoordinateTool(svg);
 	}
 }
 
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", boot, { once: true });
-} else {
+function bootOnceBodyIsLoaded(): void {
+	if (document.readyState === "loading" || !document.body) {
+		document.addEventListener("DOMContentLoaded", boot, { once: true });
+		return;
+	}
+
 	boot();
 }
+
+bootOnceBodyIsLoaded();
