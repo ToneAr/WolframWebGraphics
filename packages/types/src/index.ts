@@ -26,6 +26,20 @@ export interface IEdgeStyle {
 	width?: number | null;
 }
 
+export type TextureProjection =
+	| "Box"
+	| "Cubic"
+	| "Cylindrical"
+	| "Front"
+	| "Planar"
+	| "Spherical";
+
+export interface IPBRConfig {
+	roughness: number | null;
+	metalness: number | null;
+	emissive: [number, number, number] | null;
+}
+
 export interface IMeshConfig {
 	pos: number[];
 	idx: number[];
@@ -34,6 +48,14 @@ export interface IMeshConfig {
 	col?: number[] | null;
 	uv?: number[] | null;
 	tex?: string | null;
+	/** Normal-map data URI. */
+	ntex?: string | null;
+	/** Physically based material properties; absent meshes use Phong shading. */
+	pbr?: IPBRConfig | null;
+	/** Projection used to generate UVs when the serializer supplied none. */
+	map?: TextureProjection | null;
+	/** A large enclosing textured shell rendered from its inside faces. */
+	environment?: boolean;
 	/**
 	 * Material resolved from the in-scope directives -- nothing defaulted here.
 	 * `color` is the uniform diffuse (when not per-vertex/textured); the runtime

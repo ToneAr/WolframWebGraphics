@@ -1,5 +1,5 @@
 {
-	"plugins": ["@wrel/prettier-plugin-wolfram"],
+	"plugins": ["prettier-plugin-wolfram"],
 	"useTabs": true,
 	"wolfram": {
 		"alignRuleValues": true

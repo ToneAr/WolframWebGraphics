@@ -98,6 +98,10 @@ serialize[Style[prim_, styles___], props_] :=
 			XMLElement["g", {"opacity" -> makeSvgNumber[op]}, {node}]
 		]
 	];
+serialize[gc : GraphicsComplex[_, _, opts___], props_] /;
+	ListQ[Lookup[Association[{opts}], VertexTextureCoordinates, None]] &&
+	(!FreeQ[gc, _Texture] || currentTexture[props] =!= None) :=
+	rasterizedGraphicsElement[gc, props];
 serialize[gc_GraphicsComplex, props_] :=
 	serialize[First[Normal[Graphics[gc], GraphicsComplex]], props];
 serialize[Tooltip[StatusArea[inner_, ___], ttLabel_, ttRest___], props_] :=

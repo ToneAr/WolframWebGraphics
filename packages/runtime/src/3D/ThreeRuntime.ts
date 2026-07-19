@@ -12,6 +12,7 @@ import type {
 	ILineConfig,
 	ILightConfig,
 	IVolumeConfig,
+	TextureProjection,
 } from "@wgx/types";
 import Axes3D from "./Axes3D";
 
@@ -34,6 +35,174 @@ interface SceneTransform {
 	scale: THREE.Vector3;
 	offset: THREE.Vector3;
 }
+
+type TextureBounds = [number, number, number, number, number, number];
+
+const textureBounds = (positions: number[]): TextureBounds => {
+	const bounds: TextureBounds = [
+		Infinity,
+		-Infinity,
+		Infinity,
+		-Infinity,
+		Infinity,
+		-Infinity,
+	];
+
+	for (let index = 0; index < positions.length; index += 3) {
+		bounds[0] = Math.min(bounds[0], positions[index]);
+		bounds[1] = Math.max(bounds[1], positions[index]);
+		bounds[2] = Math.min(bounds[2], positions[index + 1]);
+		bounds[3] = Math.max(bounds[3], positions[index + 1]);
+		bounds[4] = Math.min(bounds[4], positions[index + 2]);
+		bounds[5] = Math.max(bounds[5], positions[index + 2]);
+	}
+
+	return bounds;
+};
+
+const rescaleTextureValue = (value: number, min: number, max: number) =>
+	max === min ? 0.5 : (value - min) / (max - min);
+
+const texturePlaneUV = (
+	point: [number, number, number],
+	bounds: TextureBounds,
+	axis: 0 | 1 | 2,
+): [number, number] => {
+	const axes = [0, 1, 2].filter((candidate) => candidate !== axis) as [
+		0 | 1 | 2,
+		0 | 1 | 2,
+	];
+	return [
+		rescaleTextureValue(
+			point[axes[0]],
+			bounds[axes[0] * 2],
+			bounds[axes[0] * 2 + 1],
+		),
+		rescaleTextureValue(
+			point[axes[1]],
+			bounds[axes[1] * 2],
+			bounds[axes[1] * 2 + 1],
+		),
+	];
+};
+
+const texturePlanarAxis = (bounds: TextureBounds): 0 | 1 | 2 => {
+	const extents = [
+		bounds[1] - bounds[0],
+		bounds[3] - bounds[2],
+		bounds[5] - bounds[4],
+	];
+	return extents.indexOf(Math.min(...extents)) as 0 | 1 | 2;
+};
+
+const textureTriangleNormal = (positions: number[], offset: number) => {
+	const edge1 = new THREE.Vector3(
+		positions[offset + 3] - positions[offset],
+		positions[offset + 4] - positions[offset + 1],
+		positions[offset + 5] - positions[offset + 2],
+	);
+	const edge2 = new THREE.Vector3(
+		positions[offset + 6] - positions[offset],
+		positions[offset + 7] - positions[offset + 1],
+		positions[offset + 8] - positions[offset + 2],
+	);
+	return edge1.cross(edge2).normalize();
+};
+
+const textureUV = (
+	point: [number, number, number],
+	normal: THREE.Vector3,
+	mapping: TextureProjection,
+	bounds: TextureBounds,
+	planarAxis: 0 | 1 | 2,
+): [number, number] => {
+	if (mapping === "Front") {
+		return texturePlaneUV(point, bounds, 2);
+	}
+	if (mapping === "Planar") {
+		return texturePlaneUV(point, bounds, planarAxis);
+	}
+	if (mapping === "Spherical") {
+		const center: [number, number, number] = [
+			(bounds[0] + bounds[1]) / 2,
+			(bounds[2] + bounds[3]) / 2,
+			(bounds[4] + bounds[5]) / 2,
+		];
+		const x = point[0] - center[0];
+		const y = point[1] - center[1];
+		const z = point[2] - center[2];
+		const radius = Math.hypot(x, y, z) || 1;
+		// Three.js samples the globe from the opposite longitudinal handedness
+		// to the Wolfram front-facing sphere, so reverse U to prevent east/west
+		// mirroring while retaining the Wolfram longitude seam.
+		return [
+			0.75 - Math.atan2(y, x) / (2 * Math.PI),
+			Math.acos(z / radius) / Math.PI,
+		];
+	}
+	if (mapping === "Cylindrical") {
+		const side =
+			Math.abs(normal.z) < Math.max(Math.abs(normal.x), Math.abs(normal.y));
+		if (!side) {
+			return texturePlaneUV(point, bounds, 2);
+		}
+		const centerX = (bounds[0] + bounds[1]) / 2;
+		const centerY = (bounds[2] + bounds[3]) / 2;
+		return [
+			0.5 + Math.atan2(point[1] - centerY, point[0] - centerX) / (2 * Math.PI),
+			rescaleTextureValue(point[2], bounds[4], bounds[5]),
+		];
+	}
+
+	const components = [
+		Math.abs(normal.x),
+		Math.abs(normal.y),
+		Math.abs(normal.z),
+	];
+	const axis = components.indexOf(Math.max(...components)) as 0 | 1 | 2;
+	const uv = texturePlaneUV(point, bounds, axis);
+	if (mapping === "Box" && normal.getComponent(axis) < 0) {
+		uv[0] = 1 - uv[0];
+	}
+	return uv;
+};
+
+const projectionUVs = (positions: number[], mapping: TextureProjection) => {
+	const bounds = textureBounds(positions);
+	const planarAxis = texturePlanarAxis(bounds);
+	const uv: number[] = [];
+
+	for (let offset = 0; offset < positions.length; offset += 9) {
+		const normal = textureTriangleNormal(positions, offset);
+		const triangle: [number, number][] = [];
+		for (let vertex = 0; vertex < 3; vertex += 1) {
+			const pointOffset = offset + vertex * 3;
+			triangle.push(
+				textureUV(
+					[
+						positions[pointOffset],
+						positions[pointOffset + 1],
+						positions[pointOffset + 2],
+					],
+					normal,
+					mapping,
+					bounds,
+					planarAxis,
+				),
+			);
+		}
+		if (mapping === "Cylindrical" || mapping === "Spherical") {
+			const uValues = triangle.map((value) => value[0]);
+			if (Math.max(...uValues) - Math.min(...uValues) > 0.5) {
+				for (const value of triangle) {
+					if (value[0] < 0.5) value[0] += 1;
+				}
+			}
+		}
+		for (const value of triangle) uv.push(...value);
+	}
+	return uv;
+};
 
 const VOLUME_VERTEX_SHADER = /* glsl */ `
 	out vec3 vOrigin;
@@ -323,8 +492,7 @@ export default class ThreeRuntime {
 			viewPoint[1],
 			viewPoint[2],
 		);
-		const viewPointLength =
-			viewPointMagnitude === 0 ? 1 : viewPointMagnitude;
+		const viewPointLength = viewPointMagnitude === 0 ? 1 : viewPointMagnitude;
 		const fov = viewAngle ? THREE.MathUtils.radToDeg(viewAngle) : 35;
 		const camera = new THREE.PerspectiveCamera(
 			fov,
@@ -534,7 +702,79 @@ export default class ThreeRuntime {
 		camera.add(secondaryLight);
 		camera.add(secondaryLight.target);
 	}
+	createProjectedMeshGeometry(
+		meshConfig: IMeshConfig,
+		transform: SceneTransform,
+	) {
+		const indices = meshConfig.idx.length
+			? meshConfig.idx
+			: Array.from({ length: meshConfig.pos.length / 3 }, (_, index) => index);
+		const sourcePositions: number[] = [];
+		const positions: number[] = [];
+		const normals: number[] = [];
+		const colors: number[] = [];
+
+		for (const index of indices) {
+			const offset = index * 3;
+			const source: [number, number, number] = [
+				meshConfig.pos[offset],
+				meshConfig.pos[offset + 1],
+				meshConfig.pos[offset + 2],
+			];
+			sourcePositions.push(...source);
+			positions.push(...this.transformPoint(source, transform));
+			if (meshConfig.norm) {
+				normals.push(
+					...this.transformFlatNormals(
+						meshConfig.norm.slice(offset, offset + 3),
+						transform,
+					),
+				);
+			}
+			if (meshConfig.col)
+				colors.push(...meshConfig.col.slice(offset, offset + 3));
+		}
+
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(positions, 3),
+		);
+		geometry.setAttribute(
+			"uv",
+			new THREE.Float32BufferAttribute(
+				projectionUVs(sourcePositions, meshConfig.map!),
+				2,
+			),
+		);
+		if (normals.length) {
+			geometry.setAttribute(
+				"normal",
+				new THREE.Float32BufferAttribute(normals, 3),
+			);
+		}
+		if (colors.length) {
+			geometry.setAttribute(
+				"color",
+				new THREE.Float32BufferAttribute(colors, 3),
+			);
+		}
+		return geometry;
+	}
 	createMeshGeometry(meshConfig: IMeshConfig, transform: SceneTransform) {
+		if (meshConfig.tex && meshConfig.map && !meshConfig.uv) {
+			const geometry = this.createProjectedMeshGeometry(meshConfig, transform);
+
+			if (geometry.getAttribute("normal")) {
+				return geometry;
+			}
+
+			return toCreasedNormals(
+				geometry,
+				THREE.MathUtils.degToRad(EDGE_THRESHOLD_DEG),
+			);
+		}
+
 		const geometry = new THREE.BufferGeometry();
 
 		geometry.setAttribute(
@@ -596,12 +836,48 @@ export default class ThreeRuntime {
 		const texture = meshConfig.tex
 			? new THREE.TextureLoader().load(meshConfig.tex)
 			: null;
+		if (texture) {
+			// Wolfram's v=0 texture coordinate is the lower image edge.
+			texture.flipY = true;
+			texture.wrapS = THREE.RepeatWrapping;
+			texture.wrapT = THREE.RepeatWrapping;
+		}
 		const hasVertexColors = Boolean(meshConfig.col) && !texture;
 		const opacity = meshConfig.opacity ?? 1;
+
+		if (meshConfig.pbr) {
+			const normalMap = meshConfig.ntex
+				? new THREE.TextureLoader().load(meshConfig.ntex)
+				: null;
+			if (normalMap) {
+				normalMap.wrapS = THREE.RepeatWrapping;
+				normalMap.wrapT = THREE.RepeatWrapping;
+			}
+
+			return new THREE.MeshStandardMaterial({
+				map: texture,
+				normalMap,
+				color: new THREE.Color(...(meshConfig.color ?? [1, 1, 1])),
+				vertexColors: hasVertexColors,
+				roughness: meshConfig.pbr.roughness ?? 1,
+				metalness: meshConfig.pbr.metalness ?? 0,
+				emissive: meshConfig.pbr.emissive
+					? new THREE.Color(...meshConfig.pbr.emissive)
+					: new THREE.Color(0, 0, 0),
+				side: meshConfig.environment ? THREE.BackSide : THREE.DoubleSide,
+				flatShading: false,
+				transparent: opacity < 1,
+				opacity,
+				polygonOffset: true,
+				polygonOffsetFactor: 1,
+				polygonOffsetUnits: 1,
+			});
+		}
+
 		const material = new THREE.MeshPhongMaterial({
 			map: texture,
 			vertexColors: hasVertexColors,
-			side: THREE.DoubleSide,
+			side: meshConfig.environment ? THREE.BackSide : THREE.DoubleSide,
 			flatShading: false,
 			transparent: opacity < 1,
 			opacity,
@@ -697,7 +973,10 @@ export default class ThreeRuntime {
 				const transformed = meshConfig.edgePaths.map((path) =>
 					this.transformFlatPositions(path, transform),
 				);
-				for (const line of this.createEdgePathLines(transformed, meshConfig.edge)) {
+				for (const line of this.createEdgePathLines(
+					transformed,
+					meshConfig.edge,
+				)) {
 					scene.add(line);
 				}
 			} else {
@@ -953,6 +1232,13 @@ export default class ThreeRuntime {
 			scene.add(axes.group);
 		}
 
-		this.startRenderLoop(renderer, scene, camera, controls, labelRenderer, axes);
+		this.startRenderLoop(
+			renderer,
+			scene,
+			camera,
+			controls,
+			labelRenderer,
+			axes,
+		);
 	}
 }

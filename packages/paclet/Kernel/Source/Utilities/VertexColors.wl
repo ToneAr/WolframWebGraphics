@@ -310,6 +310,8 @@ rasterizedTexturedPolygonElement[tex_Texture, poly_Polygon, props_] :=
 		]
 	];
 
+
+
 texturedPolygonElement[
 	Texture[img_Image],
 	poly : Polygon[pts_, opts___],

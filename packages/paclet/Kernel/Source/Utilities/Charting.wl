@@ -40,12 +40,12 @@ geomTransformPixelMatrix[{{{a_, b_}, {c_, d_}}, {tx_, ty_}}] :=
 			{1, 0, 0, 1, 0, 0}, (* degenerate map: identity, never ComplexInfinity *)
 			(* pixel linear = S.L.S^{-1} *)
 			sl11 = a;
-			sl12 = b  sx / sy;
-			sl21 = c  sy / sx;
+			sl12 = b sx / sy;
+			sl21 = c sy / sx;
 			sl22 = d;
 			(* pixel translation = B + S.t - SL.B *)
-			e = bx + sx  tx - (sl11  bx + sl12  by);
-			f = by + sy  ty - (sl21  bx + sl22  by);
+			e = bx + sx tx - (sl11 bx + sl12 by);
+			f = by + sy ty - (sl21 bx + sl22 by);
 			{sl11, sl21, sl12, sl22, e, f}
 		]
 	];
@@ -53,10 +53,10 @@ geomTransformPixelMatrix[{{a_, b_, tx_}, {c_, d_, ty_}, {_, _, _}}] :=
 	geomTransformPixelMatrix[{{{a, b}, {c, d}}, {tx, ty}}];
 geomTransformPixelMatrix[TransformationFunction[m_]] :=
 	geomTransformPixelMatrix[m];
-
 (*
  * Wrap a serialized primitive in a <g> carrying an SVG pixel-space matrix
  *)
+
 geomTransformWrap[prim_, mat_, props_] :=
 	XMLElement[
 		"g",
@@ -66,11 +66,11 @@ geomTransformWrap[prim_, mat_, props_] :=
 		},
 		{serialize[prim, props]}
 	];
-
 (* ::Section:: *) (* Charting Mouse Effects *)
 (*
  * Choose LightDark color based on $lightDark
  *)
+
 chartingUnwrap[LightDarkSwitched[light_]] :=
 	chartingUnwrap[Charting`DarkerLightDark[LightDarkSwitched[light], 0]];
 chartingUnwrap[LightDarkSwitched[light_, dark_]] :=
@@ -88,7 +88,6 @@ chartingUnwrap[LightDarkSwitched[light_, dark_]] :=
 chartingUnwrap[LightDarkSwitched[a_Association]] :=
 	Lookup[a, $lightDark, Lookup[a, Automatic, First[Values[a], a]]];
 chartingUnwrap[x_] := x;
-
 (*
  * The effect spec is {tag, payload}: the FIRST element is the transform TYPE,
  * either a restyle ("Style" / Style) or an affine transform
@@ -98,6 +97,7 @@ chartingUnwrap[x_] := x;
  * PieChart wedge's click effect is a "GeometricTransformation" (the explode),
  * while a hover effect is usually a "Style".
  *)
+
 hoverEffectStyle[eff_] :=
 	(*
 	 * Parse the effect's EdgeForm into an SVG style fragment (tag-agnostic: the
@@ -119,33 +119,33 @@ hoverEffectStyle[eff_] :=
 		AppendTo[parts, StringJoin[ "stroke-width:", makeSvgNumber[w]]];
 		StringRiffle[parts, ";"]
 	];
-
 (*
  * Effect type tests: tag is the first element, String or Symbol
  *)
+
 chartStyleEffectQ[{tag_, ___}] := MatchQ[tag, "Style" | Style];
 chartStyleEffectQ[_] := False;
 
 chartTransformEffectQ[{tag_, ___}] :=
 	MatchQ[tag, "GeometricTransformation" | GeometricTransformation];
 chartTransformEffectQ[_] := False;
-
 (*
  * The SVG pixel-space matrix string for a transform effect {tag, tf, ___}
  *)
+
 chartEffectMatrixString[{_, tf_, ___}] :=
 	StringJoin[
 		"matrix(",
 		StringRiffle[makeSvgNumber /@ geomTransformPixelMatrix[tf], " "],
 		")"
 	];
-
 (*
  * Attributes wiring an effect spec to the JS runtime for a given event:
  * - hover: data-wgx-hover       (restyle) | data-wgx-hover-transform (affine)
  * - click: data-wgx-click-style (restyle) | data-wgx-click           (affine)
  * An unrecognized tag yields {} (no interactivity)
  *)
+
 chartEffectAttrs["hover", eff_] :=
 	Which[
 		chartStyleEffectQ[eff],
@@ -170,12 +170,12 @@ chartEffectAttrs["click", eff_] :=
 		True,
 			{}
 	];
-
 (*
  * Attach the effect attrs to the base primitive (wrapped in a <g>). When the
  * base renders to nothing or the effect is unrecognized, render the base
  * unchanged (no empty wrapper, no XMLElement::cnts from a Null child).
  *)
+
 chartEffectElement[prim_, attrs_, props_] :=
 	With[{inner = serialize[prim, props]},
 		If[inner === Null || attrs === {},
@@ -184,7 +184,6 @@ chartEffectElement[prim_, attrs_, props_] :=
 			XMLElement["g", {}, {addAttrs[inner, attrs]}]
 		]
 	];
-
 (*
  * A pie wedge and its label are separate primitives, each with its own
  * DelayedClickEffect, but they share one Dynamic[click$NNNN] state variable so
@@ -192,6 +191,7 @@ chartEffectElement[prim_, attrs_, props_] :=
  * key (a stable hash of the Dynamic), and the JS toggles the whole group at
  * once. Elements with no Dynamic get no group (toggle individually).
  *)
+
 clickGroupKey[d_] := StringJoin[ "wgxg-", IntegerString[Hash[d], 36]];
 
 clickGroupAttr[Dynamic[var_, ___]] :=

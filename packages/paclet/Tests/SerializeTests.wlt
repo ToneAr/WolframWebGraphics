@@ -569,6 +569,24 @@ TestCreate[
 	True,
 	TestID -> "graphicscomplex-expands"
 ];
+TestCreate[
+	gtag[
+		pvt`serialize[
+			GraphicsComplex[
+				{{0., 0.}, {0.5, 0.}, {0.5, 1.}, {0., 1.}, {1., 0.}, {1., 1.}},
+				{
+					Texture[textureImg],
+					Polygon[{{1, 2, 3, 4}, {2, 5, 6, 3}}]
+				},
+				VertexTextureCoordinates ->
+					{{0., 0.}, {0.5, 0.}, {0.5, 1.}, {0., 1.}, {1., 0.}, {1., 1.}}
+			],
+			bag[]
+		]
+	],
+	"image",
+	TestID -> "graphicscomplex-preserves-texture-coordinates"
+];
 
 (* ::Section:: *) (* StyleResolution *)
 TestCreate[
@@ -2245,13 +2263,147 @@ TestCreate[
 TestCreate[
 	With[{doc = pvt`serialize[texture3D]},
 		StringContainsQ[doc, "\"tex\":\"data:image\\/png;base64,"] &&
-		StringContainsQ[
-			doc,
-			"\"uv\":[0.0,0.0,1.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,1.0]"
-		]
+			StringContainsQ[
+				doc,
+				"\"uv\":[0.0,0.0,1.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,1.0]"
+			]
 	],
 	True,
 	TestID -> "graphics3d-texture-uv-json"
+];
+
+pbrTexture3D =
+	Graphics3D[
+		{
+			MaterialShading[
+				<|
+					"BaseColor" -> Texture[textureImg],
+					"SurfaceNormals" -> Texture[textureImg],
+					"RoughnessCoefficient" -> 0.75,
+					"MetallicCoefficient" -> 0.2
+				|>
+			],
+			Sphere[]
+		}
+	];
+TestCreate[
+	With[{
+			mesh = First[ToneAr`WebGraphics`PackageScope`graphics3DMeshes[pbrTexture3D]]
+		},
+		StringStartsQ[mesh["tex"], "data:image/png;base64,"] &&
+			StringStartsQ[mesh["ntex"], "data:image/png;base64,"] &&
+			mesh["map"] === "Spherical" &&
+			mesh["pbr"] === <|
+				"roughness" -> 0.75,
+				"metalness" -> 0.2,
+				"emissive" -> {0., 0., 0.}
+			|>
+	],
+	True,
+	TestID -> "graphics3d-materialshading-pbr-textures"
+];
+texture3DProjected[map_] :=
+	First[
+		ToneAr`WebGraphics`PackageScope`graphics3DMeshes[
+			Graphics3D[
+				{
+					Texture[textureImg, map],
+					Polygon[{{0, 0, 0}, {1, 0, 0}, {1, 1, 1}, {0, 1, 1}}]
+				}
+			]
+		]
+	];
+TestCreate[
+	And @@ (
+		With[{mesh = texture3DProjected[#]},
+			StringStartsQ[mesh["tex"], "data:image/png;base64,"] &&
+			mesh["uv"] === Null && mesh["map"] === #
+		]& /@ {"Box", "Cubic", "Cylindrical", "Front", "Planar", "Spherical"}
+	),
+	True,
+	TestID -> "graphics3d-texture-projection-mappings"
+];
+TestCreate[
+	With[{mesh = texture3DProjected[Automatic]},
+		StringStartsQ[mesh["tex"], "data:image/png;base64,"] &&
+			mesh["map"] === "Planar"
+	],
+	True,
+	TestID -> "graphics3d-texture-automatic-projection"
+];
+TestCreate[
+	With[{mesh = texture3DProjected[None]},
+		mesh["tex"] === Null && mesh["uv"] === Null && mesh["map"] === Null
+	],
+	True,
+	TestID -> "graphics3d-texture-no-projection"
+];
+TestCreate[
+	With[{
+			mesh = First[ToneAr`WebGraphics`PackageScope`graphics3DMeshes[
+				Graphics3D[
+					{
+						Texture[textureImg, "Spherical"],
+						Polygon[
+							{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},
+							TextureMapping -> "Front"
+						]
+					}
+				]
+			]]
+		},
+		mesh["map"] === "Front"
+	],
+	True,
+	TestID -> "graphics3d-texturemapping-overrides-directive"
+];
+textureEnvironmentCube =
+	Graphics3D[
+		{
+			Texture[textureImg],
+			EdgeForm[],
+			Polygon[
+				{{-100, -100, -100}, {100, -100, -100}, {100, 100, -100},
+					{-100, 100, -100}, {-100, -100, 100}, {100, -100, 100},
+					{100, 100, 100}, {-100, 100, 100}},
+				{{1, 2, 3, 4}, {5, 6, 7, 8}, {1, 2, 6, 5}, {2, 3, 7, 6},
+					{3, 4, 8, 7}, {4, 1, 5, 8}},
+				VertexTextureCoordinates -> ConstantArray[
+					{{0.01, 0.01}, {0.99, 0.01}, {0.99, 0.99}, {0.01, 0.99}},
+					6
+				]
+			],
+			Torus[]
+		}
+	];
+TestCreate[
+	With[{
+			meshes = ToneAr`WebGraphics`PackageScope`graphics3DMeshes[
+				textureEnvironmentCube
+			]
+		},
+		Length[meshes] === 2 && meshes[[1]]["environment"] &&
+			Length[meshes[[1]]["uv"]] === 72 &&
+			Length[ToneAr`WebGraphics`PackageScope`allMeshVertices3D[meshes]] ===
+				Length[meshes[[2]]["pos"]] / 3
+	],
+	True,
+	TestID -> "graphics3d-indexed-texture-environment-cube"
+];
+TestCreate[
+	With[{
+			meshes = ToneAr`WebGraphics`PackageScope`graphics3DMeshes[
+				Graphics3D[
+					{{Texture[textureImg, "Spherical"], Black, Sphere[{0, 0, 0}, 100]},
+						Torus[]}
+				]
+			]
+		},
+		meshes[[1]]["map"] === "Spherical" && meshes[[1]]["environment"] &&
+			!meshes[[2]]["environment"]
+	],
+	True,
+	TestID -> "graphics3d-spherical-texture-environment"
 ];
 
 v3[g_] := pvt`graphics3DVolumes[g];

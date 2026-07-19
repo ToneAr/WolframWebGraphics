@@ -54,6 +54,60 @@ toRGB3D[n_?NumericQ] := {N[n], N[n], N[n]};
 toRGB3D[_] := Null;
 
 (* ---- directive-scoped style threading ---------------------------------- *)
+$textureProjectionMappings3D =
+	{Automatic, None, "Box", "Cubic", "Cylindrical", "Front", "Planar", "Spherical"};
+
+textureProjectionQ3D[map_] := MemberQ[$textureProjectionMappings3D, map];
+
+textureImage3D[img_Image] := img;
+textureImage3D[data_List] /;
+	1 <= ArrayDepth[data] <= 3 && ArrayQ[data, _, NumericQ] := Image[data];
+textureImage3D[obj_] := Rasterize[obj];
+
+textureSpec3D[obj_, map_] :=
+	Module[{img = textureImage3D[obj]},
+		If[ImageQ[img] && textureProjectionQ3D[map],
+			<|"image" -> img, "mapping" -> map|>,
+			Null
+		]
+	];
+
+materialTextureSpec3D[Texture[obj_]] := textureSpec3D[obj, Automatic];
+materialTextureSpec3D[Texture[obj_, map_]] := textureSpec3D[obj, map];
+materialTextureSpec3D[_] := Null;
+
+textureImageFromStyle3D[st_] :=
+	If[AssociationQ[st["texture"]], st["texture"]["image"], Null];
+
+normalTextureImageFromStyle3D[st_] :=
+	If[AssociationQ[st["normalTexture"]], st["normalTexture"]["image"], Null];
+
+textureMappingFromStyle3D[st_] :=
+	If[AssociationQ[st["texture"]], st["texture"]["mapping"], None];
+
+withTextureMapping3D[st_, Missing[]] := st;
+withTextureMapping3D[st_, map_?textureProjectionQ3D] :=
+	If[AssociationQ[st["texture"]],
+		Join[st, <|"texture" -> Join[st["texture"], <|"mapping" -> map|>]|>],
+		st
+	];
+withTextureMapping3D[st_, _] := st;
+
+automaticTextureMapping3D[st_, map_] :=
+	If[textureMappingFromStyle3D[st] === Automatic,
+		withTextureMapping3D[st, map],
+		st
+	];
+
+primitiveTextureMappingOption3D[e_] :=
+	Lookup[Association[Cases[Rest[List @@ e], _Rule | _RuleDelayed]],
+		TextureMapping, Missing[]];
+
+primitiveAutomaticTextureMapping3D[_Sphere | _Ball | _Ellipsoid] := "Spherical";
+primitiveAutomaticTextureMapping3D[_Cylinder | _Cone] := "Cylindrical";
+primitiveAutomaticTextureMapping3D[_Cuboid | _Cube] := "Box";
+primitiveAutomaticTextureMapping3D[_] := "Planar";
+
 (* Wolfram draws a thin black border on every polygon / mesh primitive by
    default; EdgeForm[] or EdgeForm[None] turns it off, EdgeForm[spec] restyles
    it. The default colour is the kernel's own black, not an invented one. *)
@@ -67,9 +121,11 @@ $defaultStyle3D =
 		"opacity"   -> Null,
 		"specular"  -> Null,
 		"shininess" -> Null,
-		"emissive"  -> Null,
-		"texture"   -> Null,
-		"thickness" -> Null,
+		"emissive"      -> Null,
+		"texture"       -> Null,
+		"normalTexture" -> Null,
+		"pbr"           -> Null,
+		"thickness"     -> Null,
 		"dashing"   -> Null,
 		"edge"      -> $edgeDefault3D
 	|>;
@@ -81,6 +137,7 @@ directiveQ3D[Glow[___]] := True;
 directiveQ3D[FaceForm[___]] := True;
 directiveQ3D[EdgeForm[___]] := True;
 directiveQ3D[Texture[___]] := True;
+directiveQ3D[MaterialShading[_Association]] := True;
 directiveQ3D[Thickness[___] | AbsoluteThickness[___]] := True;
 directiveQ3D[PointSize[___] | AbsolutePointSize[___]] := True;
 directiveQ3D[Dashing[___] | AbsoluteDashing[___]] := True;
@@ -102,7 +159,44 @@ applyDirective3D[st_, EdgeForm[]] := Join[st, <|"edge" -> $edgeOff3D|>];
 applyDirective3D[st_, EdgeForm[None]] := Join[st, <|"edge" -> $edgeOff3D|>];
 applyDirective3D[st_, EdgeForm[specs__]] :=
 	Join[st, <|"edge" -> resolveEdgeForm3D[{specs}]|>];
-applyDirective3D[st_, Texture[img_Image]] := Join[st, <|"texture" -> img|>];
+applyDirective3D[st_, Texture[obj_]] :=
+	Join[st, <|"texture" -> textureSpec3D[obj, Automatic]|>];
+applyDirective3D[st_, Texture[obj_, map_]] :=
+	Join[st, <|"texture" -> textureSpec3D[obj, map]|>];
+applyDirective3D[st_, MaterialShading[params_Association]] :=
+	Module[{baseColor, baseTexture, normalTexture, emissionColor, pbr},
+		baseColor = Lookup[params, "BaseColor", White];
+		baseTexture = materialTextureSpec3D[baseColor];
+		If[baseTexture =!= Null, baseColor = Null];
+		normalTexture = materialTextureSpec3D[
+			Lookup[params, "SurfaceNormals", None]
+		];
+		emissionColor = toRGB3D[Lookup[params, "EmissionColor", Black]];
+		pbr = <|
+			"roughness" -> Replace[
+				Lookup[params, "RoughnessCoefficient", 1],
+				{x_?NumericQ :> N[x], _ -> Null}
+			],
+			"metalness" -> Replace[
+				Lookup[params, "MetallicCoefficient", 0],
+				{x_?NumericQ :> N[x], _ -> Null}
+			],
+			"emissive" -> emissionColor
+		|>;
+		Join[
+			st,
+			<|
+				"color" -> toRGB3D[baseColor],
+				"opacity" -> Null,
+				"specular" -> Null,
+				"shininess" -> Null,
+				"emissive" -> Null,
+				"texture" -> baseTexture,
+				"normalTexture" -> normalTexture,
+				"pbr" -> pbr
+			|>
+		]
+	];
 applyDirective3D[st_, Thickness[w_?NumericQ]] :=
 	Join[st, <|"thickness" -> N[w]|>];
 applyDirective3D[st_, AbsoluteThickness[w_?NumericQ]] :=
@@ -167,11 +261,39 @@ collect3D[gc_GraphicsComplex, st_] :=
 	{<|"kind" -> "gc", "gc" -> gc, "style" -> st|>};
 collect3D[r_Raster3D, st_] :=
 	{<|"kind" -> "raster3d", "expr" -> r, "style" -> st|>};
+indexedPolygonFaces3D[faces : {{__Integer}..}] := faces;
+indexedPolygonFaces3D[face : {__Integer}] := {face};
+indexedPolygonFaces3D[_] := {};
+
+collect3D[
+	Polygon[
+		verts : {{_?NumericQ, _?NumericQ, _?NumericQ}..},
+		faces : ({{__Integer}..} | {__Integer}),
+		opts___
+	],
+	st_
+] :=
+	{<|
+		"kind" -> "polyindexed",
+		"verts" -> verts,
+		"faces" -> indexedPolygonFaces3D[faces],
+		"opts" -> {opts},
+		"style" -> withTextureMapping3D[st, primitiveTextureMappingOption3D[
+			Polygon[verts, faces, opts]
+		]]
+	|>};
 collect3D[
 	Polygon[pts : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, opts___],
 	st_
 ] :=
-	{<|"kind" -> "poly", "pts" -> pts, "opts" -> {opts}, "style" -> st|>};
+	{<|
+		"kind" -> "poly",
+		"pts" -> pts,
+		"opts" -> {opts},
+		"style" -> withTextureMapping3D[st, primitiveTextureMappingOption3D[
+			Polygon[pts, opts]
+		]]
+	|>};
 collect3D[Line[pts : {{_?NumericQ, _?NumericQ, _?NumericQ}..}, opts___], st_] :=
 	{<|"kind" -> "line", "paths" -> {pts}, "opts" -> {opts}, "style" -> st|>};
 collect3D[
@@ -180,7 +302,11 @@ collect3D[
 ] :=
 	{<|"kind" -> "line", "paths" -> pts, "opts" -> {opts}, "style" -> st|>};
 collect3D[e_?meshPrimitiveQ3D, st_] :=
-	{<|"kind" -> "meshprim", "expr" -> e, "style" -> st|>};
+	{<|
+		"kind" -> "meshprim",
+		"expr" -> e,
+		"style" -> withTextureMapping3D[st, primitiveTextureMappingOption3D[e]]
+	|>};
 collect3D[_, _] := {};
 
 $meshPrimitiveHeads3D =
@@ -192,10 +318,12 @@ $meshPrimitiveHeads3D =
 		Cylinder,
 		Cone,
 		Tube,
+		Torus,
 		CapsuleShape,
 		Simplex,
 		Tetrahedron,
-		Prism
+		Prism,
+		Cube
 	};
 
 meshPrimitiveQ3D[e_] := MemberQ[$meshPrimitiveHeads3D, Head[e]];
@@ -209,6 +337,8 @@ materialKey3D[st_] :=
 		st["shininess"],
 		st["emissive"],
 		st["texture"],
+		st["normalTexture"],
+		st["pbr"],
 		st["edge"]
 	};
 
@@ -238,6 +368,12 @@ meshAssoc3D[base_, st_, applyColor_] :=
 			"specular"  -> roundColor3D[st["specular"]],
 			"shininess" -> st["shininess"],
 			"emissive"  -> roundColor3D[st["emissive"]],
+			"ntex"      -> Replace[
+				normalTextureImageFromStyle3D[st],
+				img_Image :> imageDataURI[img],
+				{0}
+			],
+			"pbr"       -> st["pbr"],
 			"edge"      -> edgeEmit3D[st["edge"]]
 		|>
 	];
@@ -275,15 +411,17 @@ literalPolygonUVTriangles[_] := {};
 
 polyGroupMesh3D[recs_] :=
 	Module[{
-			st = recs[[1]]["style"],
+			st = automaticTextureMapping3D[recs[[1]]["style"], "Planar"],
 			tex,
+			mapping,
 			tris,
 			verts,
 			uvTris,
 			uv,
 			hasTexture
 		},
-		tex = st["texture"];
+		tex = textureImageFromStyle3D[st];
+		mapping = textureMappingFromStyle3D[st];
 		If[tex =!= Null,
 			tris = Join @@ (literalPolygonTriangles[Polygon[#["pts"]]]& /@ recs);
 			uvTris =
@@ -294,14 +432,17 @@ polyGroupMesh3D[recs_] :=
 				);
 			verts = If[tris === {}, {}, Join @@ tris];
 			uv = If[uvTris === {}, {}, Join @@ uvTris];
-			hasTexture = verts =!= {} && Length[uv] === Length[verts];
+			hasTexture =
+				verts =!= {} &&
+				(Length[uv] === Length[verts] || mapping =!= None);
 			meshAssoc3D[
 				<|
 					"pos"  -> roundFlat3D[verts],
 					"norm" -> Null,
 					"col"  -> Null,
-					"uv"   -> If[hasTexture, roundFlat3D[uv], Null],
+					"uv"   -> If[Length[uv] === Length[verts], roundFlat3D[uv], Null],
 					"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+					"map"  -> If[hasTexture && Length[uv] =!= Length[verts], mapping, Null],
 					"idx"  -> Range[0, Length[verts] - 1]
 				|>,
 				st,
@@ -316,6 +457,7 @@ polyGroupMesh3D[recs_] :=
 					"col"  -> Null,
 					"uv"   -> Null,
 					"tex"  -> Null,
+					"map"  -> Null,
 					"idx"  -> Range[0, Length[verts] - 1]
 				|>,
 				st,
@@ -327,6 +469,61 @@ polyGroupMesh3D[recs_] :=
 polyMeshes3D[{}] := {};
 polyMeshes3D[recs_List] :=
 	polyGroupMesh3D /@ GatherBy[recs, materialKey3D[#["style"]]&];
+
+indexedPolygonTriangles3D[verts_, faces_] :=
+	Module[{tris},
+		If[!AllTrue[Flatten[faces], gcVertexIndexQ3D[verts, #]&], Return[{}]];
+		tris = Join @@ (fan3D /@ faces);
+		verts[[Flatten[tris]]]
+	];
+
+indexedPolygonUVTriangles3D[verts_, faces_, opts_] :=
+	Module[{uv, tris},
+		uv = Lookup[Association[opts], VertexTextureCoordinates, None];
+		tris = Join @@ (fan3D /@ faces);
+		Which[
+			MatchQ[uv, {{_?NumericQ, _?NumericQ}..}] && Length[uv] === Length[verts],
+				uv[[Flatten[tris]]],
+			MatchQ[uv, {{{_?NumericQ, _?NumericQ}..}..}] &&
+				Length[uv] === Length[faces] && Length /@ uv === Length /@ faces,
+				Join @@ (Join @@ (fan3D /@ uv)),
+			True,
+				{}
+		]
+	];
+
+indexedPolyGroupMesh3D[recs_] :=
+	Module[{st, tex, mapping, verts, uv, hasTexture},
+		st = automaticTextureMapping3D[recs[[1]]["style"], "Planar"];
+		tex = textureImageFromStyle3D[st];
+		mapping = textureMappingFromStyle3D[st];
+		verts = Join @@ (
+			indexedPolygonTriangles3D[#["verts"], #["faces"]]& /@ recs
+		);
+		uv = Join @@ (
+			indexedPolygonUVTriangles3D[#["verts"], #["faces"], #["opts"]]& /@ recs
+		);
+		hasTexture =
+			tex =!= Null && verts =!= {} &&
+			(Length[uv] === Length[verts] || mapping =!= None);
+		meshAssoc3D[
+			<|
+				"pos"  -> roundFlat3D[verts],
+				"norm" -> Null,
+				"col"  -> Null,
+				"uv"   -> If[Length[uv] === Length[verts], roundFlat3D[uv], Null],
+				"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+				"map"  -> If[hasTexture && Length[uv] =!= Length[verts], mapping, Null],
+				"idx"  -> Range[0, Length[verts] - 1]
+			|>,
+			st,
+			!hasTexture
+		]
+	];
+
+indexedPolyMeshes3D[{}] := {};
+indexedPolyMeshes3D[recs_List] :=
+	indexedPolyGroupMesh3D /@ GatherBy[recs, materialKey3D[#["style"]]&];
 
 (* ---- GraphicsComplex groups (shared vertex pool) ----------------------- *)
 gcFacesOf3D[f : {{__Integer}..}] := f;
@@ -354,8 +551,13 @@ collectGCFaces3D[
 	st_
 ] :=
 	collectGCFaces3D[e, st];
-collectGCFaces3D[Polygon[f_, ___], st_] :=
-	{<|"faces" -> gcFacesOf3D[f], "style" -> st|>};
+collectGCFaces3D[Polygon[f_, opts___], st_] :=
+	{<|
+		"faces" -> gcFacesOf3D[f],
+		"style" -> withTextureMapping3D[st, primitiveTextureMappingOption3D[
+			Polygon[f, opts]
+		]]
+	|>};
 collectGCFaces3D[_, _] := {};
 
 gcVertexIndexQ3D[verts_, i_Integer] :=
@@ -407,33 +609,37 @@ collectGCPrimitives3D[e_?meshPrimitiveQ3D, verts_, st_] :=
 		<|
 			"kind"  -> "meshprim",
 			"expr"  -> gcResolvePrimitive3D[verts, e],
-			"style" -> st
+			"style" -> withTextureMapping3D[st, primitiveTextureMappingOption3D[e]]
 		|>
 	};
 collectGCPrimitives3D[_, _, _] := {};
 
 gcGroupMesh3D[group_, verts_, normFlat_, uv_] :=
 	Module[{
-			st = group[[1]]["style"],
+			st = automaticTextureMapping3D[group[[1]]["style"], "Planar"],
 			faces,
 			tris,
 			tex,
+			mapping,
+			explicitUV,
 			hasTexture
 		},
 		faces = Join @@ (#["faces"]& /@ group);
 		tris = Join @@ (fan3D /@ faces);
-		tex = st["texture"];
-		hasTexture =
-			tex =!= Null &&
+		tex = textureImageFromStyle3D[st];
+		mapping = textureMappingFromStyle3D[st];
+		explicitUV =
 			MatchQ[uv, {{_?NumericQ, _?NumericQ}..}] &&
-			Length[uv] === Length[verts];
+				Length[uv] === Length[verts];
+		hasTexture = tex =!= Null && (explicitUV || mapping =!= None);
 		meshAssoc3D[
 			<|
 				"pos"  -> roundFlat3D[verts],
 				"norm" -> normFlat,
 				"col"  -> Null,
-				"uv"   -> If[hasTexture, roundFlat3D[uv], Null],
+				"uv"   -> If[explicitUV, roundFlat3D[uv], Null],
 				"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+				"map"  -> If[hasTexture && !explicitUV, mapping, Null],
 				"idx"  -> Flatten[tris - 1]
 			|>,
 			st,
@@ -610,22 +816,29 @@ meshFromRegion3D[m_, st_] :=
 	Module[{
 			verts = MeshCoordinates[m],
 			faces,
-			tris
+			tris,
+			tex,
+			mapping,
+			hasTexture
 		},
 		faces = meshFaces3D[m];
 		tris = Join @@ (fan3D /@ faces);
 		If[verts === {} || tris === {}, Return[Null]];
+		tex = textureImageFromStyle3D[st];
+		mapping = textureMappingFromStyle3D[st];
+		hasTexture = tex =!= Null && mapping =!= None;
 		meshAssoc3D[
 			<|
 				"pos"  -> roundFlat3D[verts],
 				"norm" -> Null,
 				"col"  -> Null,
 				"uv"   -> Null,
-				"tex"  -> Null,
+				"tex"  -> If[hasTexture, imageDataURI[tex], Null],
+				"map"  -> If[hasTexture, mapping, Null],
 				"idx"  -> Flatten[tris - 1]
 			|>,
 			st,
-			True
+			!hasTexture
 		]
 	];
 
@@ -676,7 +889,13 @@ meshFromPrimitive3D[rec_] :=
 			paths
 		},
 		If[!meshRegionQ3D[mesh], Return[Null]];
-		assoc = meshFromRegion3D[mesh, rec["style"]];
+		assoc = meshFromRegion3D[
+			mesh,
+			automaticTextureMapping3D[
+				rec["style"],
+				primitiveAutomaticTextureMapping3D[rec["expr"]]
+			]
+		];
 		If[assoc === Null, Return[Null]];
 		paths = primitiveEdgePaths3D[rec["expr"]];
 		If[MatchQ[paths, {{{_?NumericQ, _?NumericQ, _?NumericQ}..}..}],
@@ -865,21 +1084,47 @@ graphics3DVolumes[g_] :=
 		DeleteCases[volumeFromRaster3D /@ volumeRecs, Null]
 	];
 
+meshExtent3D[m_] :=
+	Module[{pts = Partition[m["pos"], 3]},
+		If[pts === {},
+			0.,
+			Max @@ ((Subtract @@ Reverse[#])& /@ (MinMax /@ Transpose[pts]))
+		]
+	];
+
+texturedMesh3D[m_] := StringQ[Lookup[m, "tex", Null]];
+
+environmentMeshQ3D[m_, meshes_] :=
+	Module[{extent, otherExtents},
+		extent = meshExtent3D[m];
+		otherExtents = DeleteCases[meshExtent3D /@ DeleteCases[meshes, m], 0.];
+		texturedMesh3D[m] && extent >= 20. &&
+			otherExtents =!= {} && extent >= 10. Min[otherExtents]
+	];
+
+markEnvironmentMeshes3D[meshes_] :=
+	Join[#, <|"environment" -> environmentMeshQ3D[#, meshes]|>]& /@ meshes;
+
 graphics3DMeshes[g_] :=
 	Module[{
 			recs,
 			gcRecs,
 			polyRecs,
+			indexedPolyRecs,
 			meshPrimitiveRecs
 		},
 		recs = collect3D[First[g], $defaultStyle3D];
 		gcRecs = Cases[recs, r_ /; r["kind"] === "gc"];
 		polyRecs = Cases[recs, r_ /; r["kind"] === "poly"];
+		indexedPolyRecs = Cases[recs, r_ /; r["kind"] === "polyindexed"];
 		meshPrimitiveRecs = Cases[recs, r_ /; r["kind"] === "meshprim"];
-		Join[
-			Join @@ (meshFromGC3D[#["gc"], #["style"]]& /@ gcRecs),
-			polyMeshes3D[polyRecs],
-			meshPrimitiveMeshes3D[meshPrimitiveRecs]
+		markEnvironmentMeshes3D[
+			Join[
+				Join @@ (meshFromGC3D[#["gc"], #["style"]]& /@ gcRecs),
+				polyMeshes3D[polyRecs],
+				indexedPolyMeshes3D[indexedPolyRecs],
+				meshPrimitiveMeshes3D[meshPrimitiveRecs]
+			]
 		]
 	];
 
@@ -1010,7 +1255,8 @@ allMeshVertices3D[meshes_List] :=
 		verts =
 			Cases[
 				meshes,
-				m_Association /; KeyExistsQ[m, "pos"] :> Partition[m["pos"], 3]
+				m_Association /; KeyExistsQ[m, "pos"] &&
+					!TrueQ[Lookup[m, "environment", False]] :> Partition[m["pos"], 3]
 			];
 		If[verts === {}, {}, Join @@ verts]
 	];
