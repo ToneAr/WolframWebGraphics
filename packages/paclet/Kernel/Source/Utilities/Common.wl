@@ -49,7 +49,20 @@ svgElement[g : Graphics[{prims___}, opts : OptionsPattern[Graphics]]] :=
 		$wgxNeedsRuntime = False;
 		props = optionsToGlobalSvgProps[Options[gr]];
 		With[{bag = Internal`Bag[]},
-			children = DeleteCases[serialize[#, bag]& /@ {prims}, Null]
+			(*
+			 * Headless Wolfram Cloud kernels can omit Plot's HighlightElements
+			 * annotation while retaining CoordinatesToolOptions. Use that option
+			 * as the fallback signal while serialising only the primary primitives.
+			 * Axes, frame lines and ticks are appended below, outside this Block.
+			 *)
+			children =
+				Block[{
+						$wgxCurve =
+							TrueQ[$wgxCurve] ||
+							KeyExistsQ[props, "data-coordinatestooloptions"]
+					},
+					DeleteCases[serialize[#, bag]& /@ {prims}, Null]
+				]
 		];
 		children =
 			Join[

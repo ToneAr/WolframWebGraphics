@@ -1368,6 +1368,23 @@ TestCreate[
 	TestID -> "plot-curve-tagged"
 ];
 TestCreate[
+	Module[{doc},
+		doc =
+			xml[
+				Graphics[
+					{Line[{{0, 0}, {1, 1}, {2, 0}}]},
+					PlotRange              -> {{0, 2}, {0, 1}},
+					Axes                   -> True,
+					CoordinatesToolOptions -> {}
+				]
+			];
+		StringCount[doc, "class='wgx-curve'"] === 1 &&
+			StringContainsQ[doc, "id='wgx-"]
+	],
+	True,
+	TestID -> "cloud-plot-curve-fallback"
+];
+TestCreate[
 	StringContainsQ[xml[Plot[Sin[x], {x, 0, 2  Pi}]], "data-mapax="],
 	True,
 	TestID -> "plot-inverse-map-embedded"

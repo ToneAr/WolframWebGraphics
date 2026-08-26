@@ -8,6 +8,7 @@ import type {
 
 export default class SVGRuntime {
 	static svgNamespace = "http://www.w3.org/2000/svg";
+	static generatedElementId = 0;
 	elements: SVGSVGElement[] = [];
 	ssrElements: HTMLDivElement[] = [];
 	/** The tooltip currently shown, and the SVG that owns it. */
@@ -19,10 +20,12 @@ export default class SVGRuntime {
 	/** Per-element click-toggle state, and parsed polyline point caches. */
 	clicked = new WeakMap<Element, boolean>();
 	polylinePoints = new WeakMap<SVGPolylineElement, ICartesianCoordinates2[]>();
+	private readonly document: Document;
 	constructor(document: Document) {
+		this.document = document;
 		this.ssrElements = Array.from(
 			document.querySelectorAll<HTMLDivElement>("div[data-wgx-ssr-endpoint]"),
-		)
+		);
 		this.elements = Array.from(
 			document.querySelectorAll<SVGSVGElement>("svg[id^='wgx']"),
 		);
@@ -36,7 +39,7 @@ export default class SVGRuntime {
 	 * has settled (each independently; one failure doesn't sink the rest).
 	 * @returns a promise that settles when all placeholders are processed
 	 */
-	populate(): Promise<void> {
+	async populate(): Promise<void> {
 		const pending: Promise<void>[] = [];
 		for (const ssrElement of this.ssrElements) {
 			const endpoint = ssrElement.getAttribute("data-wgx-ssr-endpoint");
@@ -71,21 +74,12 @@ export default class SVGRuntime {
 						}
 						return res.text();
 					})
-					.then((svgText) => {
-						const svgDoc = new DOMParser().parseFromString(
-							svgText,
-							"image/svg+xml",
-						);
-						if (svgDoc.querySelector("parsererror")) {
-							throw new Error("SSR response was not valid SVG");
-						}
-						// I don't love this double cast but i lazy
-						const svgElement = svgDoc.documentElement as unknown as SVGSVGElement;
+					.then((responseText) => {
+						const svgElement = this.parseSsrSvg(responseText);
 						ssrElement.replaceWith(svgElement);
 						this.elements.push(svgElement);
-						// Bring the freshly injected SVG to life. hydrate() is
-						// idempotent (skips `[data-wgx-hydrated]`), so re-running it
-						// over the whole element list only touches the new node.
+						// Each interaction type has its own hydration marker, so this is
+						// idempotent even when a chart node supports several behaviors.
 						this.hydrate();
 						this.initializeCoordinateTool(svgElement);
 					})
@@ -95,6 +89,22 @@ export default class SVGRuntime {
 			);
 		}
 		return Promise.all(pending).then(() => undefined);
+	}
+	/**
+	 * Extract the first SVG from the HTML returned by an SSR endpoint and import
+	 * it into the live document. Parsing as HTML supports both the documented
+	 * HTML response and a bare SVG response.
+	 */
+	parseSsrSvg(responseText: string): SVGSVGElement {
+		const responseDocument = new DOMParser().parseFromString(
+			responseText,
+			"text/html",
+		);
+		const parsedSvg = responseDocument.querySelector("svg");
+		if (parsedSvg?.namespaceURI !== SVGRuntime.svgNamespace) {
+			throw new Error("SSR response did not contain a valid SVG element");
+		}
+		return this.document.importNode(parsedSvg, true);
 	}
 	/**
 	 * Bind all interactive element event listeners
@@ -123,7 +133,7 @@ export default class SVGRuntime {
 	hydrateClickAreas(): void {
 		this.elements.forEach((svg) => {
 			const clickAreas = svg.querySelectorAll<SVGGElement>(
-				"[data-wgx-click]:not([data-wgx-hydrated]),[data-wgx-click-style]:not([data-wgx-hydrated])",
+				"[data-wgx-click]:not([data-wgx-click-hydrated]),[data-wgx-click-style]:not([data-wgx-click-hydrated])",
 			);
 			if (!clickAreas) {
 				return;
@@ -132,7 +142,7 @@ export default class SVGRuntime {
 				clickArea.addEventListener("click", (event) => {
 					this.wgxClickToggle(event);
 				});
-				clickArea.setAttribute("data-wgx-hydrated", "true");
+				clickArea.setAttribute("data-wgx-click-hydrated", "true");
 			}
 		});
 	}
@@ -142,7 +152,7 @@ export default class SVGRuntime {
 	hydrateHoverAreas(): void {
 		this.elements.forEach((svg) => {
 			const hoverAreas = svg.querySelectorAll<SVGGElement>(
-				"[data-wgx-hover]:not([data-wgx-hydrated]),[data-wgx-hover-transform]:not([data-wgx-hydrated])",
+				"[data-wgx-hover]:not([data-wgx-hover-hydrated]),[data-wgx-hover-transform]:not([data-wgx-hover-hydrated])",
 			);
 			if (!hoverAreas) {
 				return;
@@ -154,7 +164,7 @@ export default class SVGRuntime {
 				hoverArea.addEventListener("mouseout", (event) => {
 					this.wgxHoverOff(event);
 				});
-				hoverArea.setAttribute("data-wgx-hydrated", "true");
+				hoverArea.setAttribute("data-wgx-hover-hydrated", "true");
 			}
 		});
 	}
@@ -164,7 +174,7 @@ export default class SVGRuntime {
 	hydrateStatusAreas(): void {
 		this.elements.forEach((svg) => {
 			const statusAreas = svg.querySelectorAll<SVGGElement>(
-				"[data-wgx-status-id]:not([data-wgx-hydrated])",
+				"[data-wgx-status-id]:not([data-wgx-status-hydrated])",
 			);
 			for (const statusArea of statusAreas) {
 				// The label rides on the status-area element itself (mirroring the
@@ -177,7 +187,7 @@ export default class SVGRuntime {
 				statusArea.addEventListener("mouseout", (event) => {
 					this.clearStatusText(event);
 				});
-				statusArea.setAttribute("data-wgx-hydrated", "true");
+				statusArea.setAttribute("data-wgx-status-hydrated", "true");
 			}
 		});
 	}
@@ -187,7 +197,7 @@ export default class SVGRuntime {
 	hydrateTooltips(): void {
 		this.elements.forEach((svg) => {
 			const tooltips = svg.querySelectorAll<SVGGElement>(
-				"[data-wgx-tooltip-id]:not([data-wgx-hydrated])",
+				"[data-wgx-tooltip-id]:not([data-wgx-tooltip-hydrated])",
 			);
 			for (const tooltipGroup of tooltips) {
 				const tooltipId = tooltipGroup.getAttribute("data-wgx-tooltip-id");
@@ -205,7 +215,7 @@ export default class SVGRuntime {
 					tooltipGroup.addEventListener("mouseout", () => {
 						this.hideTooltip();
 					});
-					tooltipGroup.setAttribute("data-wgx-hydrated", "true");
+					tooltipGroup.setAttribute("data-wgx-tooltip-hydrated", "true");
 				}
 			}
 		});
@@ -1027,13 +1037,52 @@ export default class SVGRuntime {
 		);
 	}
 	/**
+	 * Return explicitly marked coordinate curves, or recover line-plot curves
+	 * from a mapped SSR SVG produced by a headless Wolfram Cloud kernel. The
+	 * fallback deliberately requires at least three points so two-point axes,
+	 * frame edges, grid lines and tick marks are not promoted.
+	 * @param svg The SVG whose coordinate curves to find
+	 */
+	getCoordinateCurves(svg: SVGSVGElement): Element[] {
+		const markedCurves = Array.from(svg.getElementsByClassName("wgx-curve"));
+		if (markedCurves.length > 0) {
+			return markedCurves;
+		}
+		const map = ["data-mapax", "data-mapbx", "data-mapay", "data-mapby"].map(
+			(attribute) => parseFloat(svg.getAttribute(attribute) ?? ""),
+		);
+		if (!map.every(Number.isFinite)) {
+			return [];
+		}
+		const fallbackCurves = Array.from(
+			svg.querySelectorAll<SVGPolylineElement>("polyline[points]"),
+		).filter((polyline) => {
+			const points = this.getPolylinePoints(polyline);
+			return (
+				points.length >= 3 &&
+				points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+			);
+		});
+		if (fallbackCurves.length === 0) {
+			return [];
+		}
+		for (const curve of fallbackCurves) {
+			curve.classList.add("wgx-curve");
+		}
+		if (!svg.id) {
+			SVGRuntime.generatedElementId += 1;
+			svg.id = `wgx-ssr-${SVGRuntime.generatedElementId}`;
+		}
+		return fallbackCurves;
+	}
+	/**
 	 * Wire up the live coordinate-readout tool for an SVG that contains
 	 * `wgx-curve` elements: on mousemove, snap to the nearest curve point and
 	 * show its data-space coordinates; on mouseleave, hide the readout.
 	 * @param svg The SVG to attach the tool to
 	 */
 	initializeCoordinateTool(svg: SVGSVGElement): void {
-		const curves = svg.getElementsByClassName("wgx-curve");
+		const curves = this.getCoordinateCurves(svg);
 		if (curves.length === 0) {
 			return;
 		}

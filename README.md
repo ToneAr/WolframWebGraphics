@@ -255,6 +255,21 @@ it:
 Because the page only needs to include `wgx-runtime.js`, a server-rendered
 dashboard stays lean. The graphics are produced kernel-side per request.
 
+> [!IMPORTANT]
+> On Wolfram Cloud, the page, API, and every runtime asset are separate
+> `CloudObject`s. Making the page and API public does not make
+> `wgx-runtime.js`, its lazily loaded `wgx-runtime-lib-*.js` files, or `wgx.css`
+> public. Public pages must grant public permission to all runtime objects; an
+> otherwise successful request returns the Wolfram sign-in page instead of
+> JavaScript, leaving the SSR placeholders inert.
+>
+> ```wl
+> Scan[
+> 	SetPermissions[#, "Public"] &,
+> 	CloudObjects["/tmp/wgx-runtime/*"]
+> ]
+> ```
+
 ## JavaScript Runtime
 A single entry script, `wgx-runtime.js`, boots only what the page needs,
 detected from the DOM at load time:

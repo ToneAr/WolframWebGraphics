@@ -1,0 +1,438 @@
+<?xml version='1.0'?>
+<!DOCTYPE Expression SYSTEM 'http://www.wolfram.com/XML/notebookml1.dtd'>
+<Expression xmlns:mathematica='http://www.wolfram.com/XML/'
+    xmlns='http://www.wolfram.com/XML/'>
+ <String>&lt;svg xmlns=&apos;http://www.w3.org/2000/svg&apos;
+    xmlns:xlink=&apos;http://www.w3.org/1999/xlink&apos;
+    width=&apos;360&apos;
+    height=&apos;359.4256&apos;
+    viewBox=&apos;0 0 360 359.4256&apos;
+    overflow=&apos;visible&apos;
+    preserveAspectRatio=&apos;none&apos;
+    data-mapax=&apos;172.3200&apos;
+    data-mapbx=&apos;179.5&apos;
+    data-mapay=&apos;-172.3200&apos;
+    data-mapby=&apos;179.2128&apos;
+    id=&apos;wgx-2f6faee3-2ac7-4bae-9ba6-317e3711ead3&apos;&gt;
+ &lt;style&gt;.wgx-tip{pointer-events:none;z-index:99999}.wgx-tip rect{fill:#ffffe0;stroke:#999;stroke-width:0;z-index:99999}.wgx-tip text{font-family:sans-serif;padding-top:20px;z-index:99999}.wgx-status{font-family:sans-serif;fill:#757575}.wgx-mo-h{opacity:0;pointer-events:none}.wgx-mo:hover .wgx-mo-d{opacity:0}.wgx-mo:hover .wgx-mo-h{opacity:1}[data-wgx-click]{transition:transform 0.15s ease}&lt;/style&gt;
+ &lt;script&gt;var L = class B {
+  static svgNamespace = &quot;http://www.w3.org/2000/svg&quot;;
+  elements = [];
+  ssrElements = [];
+  activeTooltip = null;
+  activeTooltipSvg = null;
+  priorStyles = /* @__PURE__ */ new WeakMap();
+  priorTransforms = /* @__PURE__ */ new WeakMap();
+  clicked = /* @__PURE__ */ new WeakMap();
+  polylinePoints = /* @__PURE__ */ new WeakMap();
+  constructor(t) {
+    this.ssrElements = Array.from(t.querySelectorAll(&quot;div[data-wgx-ssr-endpoint]&quot;)), this.elements = Array.from(t.querySelectorAll(&quot;svg[id^=&apos;wgx&apos;]&quot;)), this.hydrate();
+  }
+  populate() {
+    const t = [];
+    for (const e of this.ssrElements) {
+      const i = e.getAttribute(&quot;data-wgx-ssr-endpoint&quot;);
+      if (!i) continue;
+      const r = e.getAttribute(&quot;data-wgx-ssr-params&quot;) ?? &quot;&quot;, n = e.getAttribute(&quot;data-wgx-ssr-body&quot;) ?? null, s = e.getAttribute(&quot;data-wgx-ssr-headers&quot;);
+      let o;
+      try {
+        o = s ? JSON.parse(s) : void 0;
+      } catch (l) {
+        console.error(&quot;Invalid SSR headers, skipping element:&quot;, l);
+        continue;
+      }
+      const c = new Request(`${i}${r ? `?${r}` : &quot;&quot;}`, {
+        method: &quot;POST&quot;,
+        body: n ?? void 0,
+        headers: o ? new Headers(o) : void 0
+      });
+      t.push(fetch(c).then((l) =&amp;gt; {
+        if (!l.ok) throw new Error(`SSR request failed: ${l.status} ${l.statusText}`);
+        return l.text();
+      }).then((l) =&amp;gt; {
+        const u = new DOMParser().parseFromString(l, &quot;image/svg+xml&quot;);
+        if (u.querySelector(&quot;parsererror&quot;)) throw new Error(&quot;SSR response was not valid SVG&quot;);
+        const a = u.documentElement;
+        e.replaceWith(a), this.elements.push(a), this.hydrate(), this.initializeCoordinateTool(a);
+      }).catch((l) =&amp;gt; {
+        console.error(&quot;Failed to populate SSR content:&quot;, l);
+      }));
+    }
+    return Promise.all(t).then(() =&amp;gt; {
+    });
+  }
+  hydrate() {
+    this.hydrateClickAreas(), this.hydrateHoverAreas(), this.hydrateStatusAreas(), this.hydrateTooltips();
+  }
+  hydrateClickAreas() {
+    this.elements.forEach((t) =&amp;gt; {
+      const e = t.querySelectorAll(&quot;[data-wgx-click]:not([data-wgx-hydrated]),[data-wgx-click-style]:not([data-wgx-hydrated])&quot;);
+      if (e)
+        for (const i of e)
+          i.addEventListener(&quot;click&quot;, (r) =&amp;gt; {
+            this.wgxClickToggle(r);
+          }), i.setAttribute(&quot;data-wgx-hydrated&quot;, &quot;true&quot;);
+    });
+  }
+  hydrateHoverAreas() {
+    this.elements.forEach((t) =&amp;gt; {
+      const e = t.querySelectorAll(&quot;[data-wgx-hover]:not([data-wgx-hydrated]),[data-wgx-hover-transform]:not([data-wgx-hydrated])&quot;);
+      if (e)
+        for (const i of e)
+          i.addEventListener(&quot;mouseover&quot;, (r) =&amp;gt; {
+            this.wgxHoverOn(r);
+          }), i.addEventListener(&quot;mouseout&quot;, (r) =&amp;gt; {
+            this.wgxHoverOff(r);
+          }), i.setAttribute(&quot;data-wgx-hydrated&quot;, &quot;true&quot;);
+    });
+  }
+  hydrateStatusAreas() {
+    this.elements.forEach((t) =&amp;gt; {
+      const e = t.querySelectorAll(&quot;[data-wgx-status-id]:not([data-wgx-hydrated])&quot;);
+      for (const i of e) {
+        const r = i.getAttribute(&quot;data-wgx-status-text&quot;) ?? &quot;&quot;;
+        i.addEventListener(&quot;mouseover&quot;, (n) =&amp;gt; {
+          this.setStatusText(n, r);
+        }), i.addEventListener(&quot;mouseout&quot;, (n) =&amp;gt; {
+          this.clearStatusText(n);
+        }), i.setAttribute(&quot;data-wgx-hydrated&quot;, &quot;true&quot;);
+      }
+    });
+  }
+  hydrateTooltips() {
+    this.elements.forEach((t) =&amp;gt; {
+      const e = t.querySelectorAll(&quot;[data-wgx-tooltip-id]:not([data-wgx-hydrated])&quot;);
+      for (const i of e) {
+        const r = i.getAttribute(&quot;data-wgx-tooltip-id&quot;);
+        r &amp;amp;&amp;amp; r &amp;amp;&amp;amp; t.getElementById(r) &amp;amp;&amp;amp; (i.addEventListener(&quot;mouseover&quot;, (n) =&amp;gt; {
+          this.showTooltip(n, r);
+        }), i.addEventListener(&quot;mousemove&quot;, (n) =&amp;gt; {
+          this.moveTooltip(n);
+        }), i.addEventListener(&quot;mouseout&quot;, () =&amp;gt; {
+          this.hideTooltip();
+        }), i.setAttribute(&quot;data-wgx-hydrated&quot;, &quot;true&quot;));
+      }
+    });
+  }
+  getEventTarget(t) {
+    return t?.target ?? null;
+  }
+  eventToPoint(t, e) {
+    const i = t.createSVGPoint();
+    i.x = e.clientX, i.y = e.clientY;
+    const r = t.getScreenCTM(), n = r ? i.matrixTransform(r.inverse()) : i;
+    return {
+      x: n.x,
+      y: n.y
+    };
+  }
+  screenVectorToSvg(t, e, i) {
+    const r = t.getScreenCTM()?.inverse(), n = t.createSVGPoint(), s = t.createSVGPoint();
+    n.x = 0, n.y = 0, s.x = e, s.y = i;
+    const o = r ? n.matrixTransform(r) : n, c = r ? s.matrixTransform(r) : s;
+    return {
+      x: Math.abs(c.x - o.x),
+      y: Math.abs(c.y - o.y)
+    };
+  }
+  resizeForeignObjectToContents(t) {
+    const e = t.querySelector(&quot;math&quot;) ?? t.firstElementChild, i = t.ownerSVGElement;
+    if (!e?.getBoundingClientRect || !i) return;
+    const r = e.getBoundingClientRect();
+    if (r.width &amp;lt;= 0 || r.height &amp;lt;= 0) return;
+    const n = this.screenVectorToSvg(i, r.width, r.height);
+    t.setAttribute(&quot;width&quot;, n.x.toString()), t.setAttribute(&quot;height&quot;, n.y.toString());
+  }
+  unionBox(t, e) {
+    if (!t) return e;
+    const i = Math.min(t.x, e.x), r = Math.min(t.y, e.y), n = Math.max(t.x + t.width, e.x + e.width), s = Math.max(t.y + t.height, e.y + e.height);
+    return new DOMRect(i, r, n - i, s - r);
+  }
+  tooltipContentBox(t, e) {
+    let i = null;
+    for (const r of t.children) {
+      if (r === e || !(r instanceof SVGGraphicsElement) || !r.getBBox) continue;
+      const n = r.getBBox();
+      (n.width &amp;gt; 0 || n.height &amp;gt; 0) &amp;amp;&amp;amp; (i = this.unionBox(i, n));
+    }
+    return i;
+  }
+  getEventSvg(t) {
+    const e = t?.target;
+    return e ? e.ownerSVGElement ?? e : null;
+  }
+  tooltipBackground(t) {
+    for (const e of t.children) if (e.tagName.toLowerCase() === &quot;rect&quot; &amp;amp;&amp;amp; e.classList.contains(&quot;wgx-tip-bg&quot;)) return e;
+    return null;
+  }
+  resizeTooltip(t) {
+    const e = this.tooltipBackground(t);
+    if (!e) return;
+    const i = t.getElementsByTagName(&quot;foreignObject&quot;);
+    for (const o of i) this.resizeForeignObjectToContents(o);
+    const r = this.tooltipContentBox(t, e);
+    if (!r) return;
+    const n = Math.max(4, r.x - parseFloat(e.getAttribute(&quot;x&quot;) ?? &quot;0&quot;)), s = Math.max(4, r.y - parseFloat(e.getAttribute(&quot;y&quot;) ?? &quot;0&quot;));
+    e.setAttribute(&quot;x&quot;, String(r.x - n)), e.setAttribute(&quot;y&quot;, String(r.y - s)), e.setAttribute(&quot;width&quot;, String(r.width + 2 * n)), e.setAttribute(&quot;height&quot;, String(r.height + 2 * s));
+  }
+  showTooltip(t, e) {
+    const i = this.getEventSvg(t), r = i?.getElementById(e) ?? null;
+    if (!i || !r) return;
+    this.activeTooltip = r, this.activeTooltipSvg = i, i.appendChild(r), r.style.display = &quot;inline&quot;, this.resizeTooltip(r), this.moveTooltip(t);
+    const n = r;
+    window.requestAnimationFrame(() =&amp;gt; {
+      this.activeTooltip === n &amp;amp;&amp;amp; this.resizeTooltip(n);
+    });
+  }
+  moveTooltip(t) {
+    if (!this.activeTooltip || !this.activeTooltipSvg) return;
+    const e = this.eventToPoint(this.activeTooltipSvg, t);
+    this.activeTooltip.setAttribute(&quot;transform&quot;, `translate(${e.x} ${e.y})`);
+  }
+  hideTooltip() {
+    this.activeTooltip &amp;amp;&amp;amp; (this.activeTooltip.style.display = &quot;none&quot;, this.activeTooltip = null, this.activeTooltipSvg = null);
+  }
+  setStatusText(t, e) {
+    const i = this.getEventSvg(t)?.getElementById(&quot;wgx-status&quot;) ?? null;
+    i &amp;amp;&amp;amp; (i.textContent = e);
+  }
+  clearStatusText(t) {
+    const e = this.getEventSvg(t)?.getElementById(&quot;wgx-status&quot;) ?? null;
+    e &amp;amp;&amp;amp; (e.textContent = &quot;&quot;);
+  }
+  wgxApplyStyle(t, e) {
+    this.priorStyles.has(t) || this.priorStyles.set(t, t.getAttribute(&quot;style&quot;) ?? &quot;&quot;);
+    const i = this.priorStyles.get(t) ?? &quot;&quot;;
+    t.setAttribute(&quot;style&quot;, i + (i ? &quot;;&quot; : &quot;&quot;) + e);
+  }
+  wgxRestoreStyle(t) {
+    this.priorStyles.has(t) &amp;amp;&amp;amp; (t.setAttribute(&quot;style&quot;, this.priorStyles.get(t) ?? &quot;&quot;), this.priorStyles.delete(t));
+  }
+  wgxHoverOn(t) {
+    const e = t.currentTarget ?? t.target, i = e.getAttribute(&quot;data-wgx-hover&quot;), r = e.getAttribute(&quot;data-wgx-hover-transform&quot;);
+    i &amp;amp;&amp;amp; this.wgxApplyStyle(e, i), r &amp;amp;&amp;amp; (this.priorTransforms.has(e) || this.priorTransforms.set(e, e.getAttribute(&quot;transform&quot;) ?? &quot;&quot;), e.setAttribute(&quot;transform&quot;, r));
+  }
+  wgxHoverOff(t) {
+    const e = t.currentTarget ?? t.target;
+    if (this.wgxRestoreStyle(e), this.priorTransforms.has(e)) {
+      const i = this.priorTransforms.get(e) ?? &quot;&quot;;
+      i ? e.setAttribute(&quot;transform&quot;, i) : e.removeAttribute(&quot;transform&quot;), this.priorTransforms.delete(e);
+    }
+  }
+  wgxToggleClickEl(t, e) {
+    const i = t.getAttribute(&quot;data-wgx-click&quot;), r = t.getAttribute(&quot;data-wgx-click-style&quot;);
+    i &amp;amp;&amp;amp; (e ? t.setAttribute(&quot;transform&quot;, i) : t.removeAttribute(&quot;transform&quot;)), r &amp;amp;&amp;amp; (e ? this.wgxApplyStyle(t, r) : this.wgxRestoreStyle(t)), this.clicked.set(t, e);
+  }
+  wgxClickToggle(t) {
+    const e = t.currentTarget ?? t.target, i = !this.clicked.get(e), r = e.getAttribute(&quot;data-wgx-click-group&quot;);
+    r ? (e.ownerSVGElement ?? e).querySelectorAll(`[data-wgx-click-group=&quot;${r}&quot;]`).forEach((n) =&amp;gt; this.wgxToggleClickEl(n, i)) : this.wgxToggleClickEl(e, i);
+  }
+  hideCoordinateReadout(t) {
+    const e = [
+      t.marker,
+      t.labelLeader,
+      t.labelBackground,
+      t.labelOutline,
+      t.labelAccent,
+      t.label
+    ];
+    for (const i of e) i &amp;amp;&amp;amp; (i.style.display = &quot;none&quot;);
+  }
+  ensureCoordinateReadout(t, e) {
+    if (e.marker &amp;amp;&amp;amp; e.labelLeader &amp;amp;&amp;amp; e.labelBackground &amp;amp;&amp;amp; e.labelOutline &amp;amp;&amp;amp; e.labelAccent &amp;amp;&amp;amp; e.label) return;
+    const i = B.svgNamespace, r = document.createElementNS(i, &quot;circle&quot;);
+    r.setAttribute(&quot;class&quot;, &quot;wgx-coord-marker&quot;), r.setAttribute(&quot;r&quot;, &quot;4&quot;), r.setAttribute(&quot;stroke&quot;, &quot;#101a30&quot;), r.setAttribute(&quot;stroke-width&quot;, &quot;1.25&quot;), r.setAttribute(&quot;vector-effect&quot;, &quot;non-scaling-stroke&quot;), r.style.display = &quot;none&quot;, r.style.pointerEvents = &quot;none&quot;, t.appendChild(r), e.marker = r;
+    const n = document.createElementNS(i, &quot;polyline&quot;);
+    n.setAttribute(&quot;class&quot;, &quot;wgx-coord-leader&quot;), n.setAttribute(&quot;fill&quot;, &quot;none&quot;), n.setAttribute(&quot;stroke-width&quot;, &quot;1.75&quot;), n.setAttribute(&quot;stroke-linecap&quot;, &quot;butt&quot;), n.setAttribute(&quot;stroke-linejoin&quot;, &quot;miter&quot;), n.setAttribute(&quot;vector-effect&quot;, &quot;non-scaling-stroke&quot;), n.style.display = &quot;none&quot;, n.style.pointerEvents = &quot;none&quot;, t.appendChild(n), e.labelLeader = n;
+    const s = document.createElementNS(i, &quot;rect&quot;);
+    s.setAttribute(&quot;class&quot;, &quot;wgx-coord-box&quot;), s.setAttribute(&quot;rx&quot;, &quot;0&quot;), s.setAttribute(&quot;ry&quot;, &quot;0&quot;), s.setAttribute(&quot;fill&quot;, &quot;#1a1a1a&quot;), s.style.display = &quot;none&quot;, s.style.pointerEvents = &quot;none&quot;, t.appendChild(s), e.labelBackground = s;
+    const o = document.createElementNS(i, &quot;rect&quot;);
+    o.setAttribute(&quot;class&quot;, &quot;wgx-coord-outline&quot;), o.setAttribute(&quot;rx&quot;, &quot;0&quot;), o.setAttribute(&quot;ry&quot;, &quot;0&quot;), o.setAttribute(&quot;fill&quot;, &quot;none&quot;), o.setAttribute(&quot;stroke-width&quot;, &quot;1.75&quot;), o.setAttribute(&quot;vector-effect&quot;, &quot;non-scaling-stroke&quot;), o.style.display = &quot;none&quot;, o.style.pointerEvents = &quot;none&quot;, t.appendChild(o), e.labelOutline = o;
+    const c = document.createElementNS(i, &quot;line&quot;);
+    t.appendChild(c), e.labelAccent = c;
+    const l = document.createElementNS(i, &quot;text&quot;);
+    l.setAttribute(&quot;class&quot;, &quot;wgx-coord-label&quot;), l.setAttribute(&quot;font-size&quot;, &quot;12&quot;), l.setAttribute(&quot;font-family&quot;, &quot;sans-serif&quot;), l.setAttribute(&quot;fill&quot;, &quot;#eaf2ff&quot;), l.style.display = &quot;none&quot;, l.style.pointerEvents = &quot;none&quot;, t.appendChild(l), e.label = l;
+  }
+  getPolylinePoints(t) {
+    const e = this.polylinePoints.get(t);
+    if (e) return e;
+    const i = (t.getAttribute(&quot;points&quot;) ?? &quot;&quot;).trim().split(/\s+/).map((r) =&amp;gt; {
+      const n = r.split(&quot;,&quot;);
+      return {
+        x: parseFloat(n[0]),
+        y: parseFloat(n[1])
+      };
+    });
+    return this.polylinePoints.set(t, i), i;
+  }
+  transformCurvePoint(t, e, i, r) {
+    const n = t.createSVGPoint();
+    n.x = r.x, n.y = r.y;
+    const s = e &amp;amp;&amp;amp; i ? n.matrixTransform(e).matrixTransform(i) : n;
+    return {
+      x: s.x,
+      y: s.y,
+      localX: r.x,
+      localY: r.y
+    };
+  }
+  nearestPointOnSegment(t, e, i) {
+    const r = i.x - e.x, n = i.y - e.y, s = r * r + n * n;
+    let o = 0;
+    s !== 0 &amp;amp;&amp;amp; (o = ((t.x - e.x) * r + (t.y - e.y) * n) / s, o = Math.max(0, Math.min(1, o)));
+    const c = e.x + o * r, l = e.y + o * n, u = t.x - c, a = t.y - l;
+    return {
+      x: c,
+      y: l,
+      localX: e.localX + o * (i.localX - e.localX),
+      localY: e.localY + o * (i.localY - e.localY),
+      distanceSquared: u * u + a * a
+    };
+  }
+  nearestPointOnPolyline(t, e, i) {
+    const r = this.getPolylinePoints(e);
+    if (r.length &amp;lt; 2) return null;
+    const n = e.getScreenCTM(), s = t.getScreenCTM()?.inverse() ?? null;
+    let o = null, c = this.transformCurvePoint(t, n, s, r[0]);
+    for (let l = 1; l &amp;lt; r.length; l += 1) {
+      const u = this.transformCurvePoint(t, n, s, r[l]), a = this.nearestPointOnSegment(i, c, u);
+      (o === null || a.distanceSquared &amp;lt; o.distanceSquared) &amp;amp;&amp;amp; (o = a), c = u;
+    }
+    return o;
+  }
+  nearestPointOnCircle(t, e, i) {
+    const r = e.getScreenCTM(), n = t.getScreenCTM()?.inverse() ?? null, s = this.transformCurvePoint(t, r, n, {
+      x: parseFloat(e.getAttribute(&quot;cx&quot;) ?? &quot;&quot;),
+      y: parseFloat(e.getAttribute(&quot;cy&quot;) ?? &quot;&quot;)
+    });
+    if (!isFinite(s.x) || !isFinite(s.y)) return null;
+    const o = i.x - s.x, c = i.y - s.y;
+    return {
+      x: s.x,
+      y: s.y,
+      localX: s.localX,
+      localY: s.localY,
+      distanceSquared: o * o + c * c
+    };
+  }
+  nearestPointOnCurve(t, e, i) {
+    const r = e.tagName.toLowerCase();
+    return r === &quot;polyline&quot; ? this.nearestPointOnPolyline(t, e, i) : r === &quot;circle&quot; ? this.nearestPointOnCircle(t, e, i) : null;
+  }
+  usablePaint(t) {
+    return !!t &amp;amp;&amp;amp; t !== &quot;none&quot; &amp;amp;&amp;amp; t !== &quot;transparent&quot; &amp;amp;&amp;amp; t !== &quot;rgba(0, 0, 0, 0)&quot;;
+  }
+  getCurveStrokeColor(t) {
+    const e = window.getComputedStyle(t), i = e.stroke, r = e.fill, n = t.getAttribute(&quot;stroke&quot;), s = t.getAttribute(&quot;fill&quot;);
+    return this.usablePaint(i) ? i : this.usablePaint(n) ? n : this.usablePaint(r) ? r : this.usablePaint(s) ? s : &quot;#d62728&quot;;
+  }
+  clamp(t, e, i) {
+    return i &amp;lt; e ? e : Math.max(e, Math.min(i, t));
+  }
+  getSvgBounds(t) {
+    const e = t.viewBox.baseVal;
+    if (e.width &amp;gt; 0 &amp;amp;&amp;amp; e.height &amp;gt; 0) return {
+      x: e.x,
+      y: e.y,
+      width: e.width,
+      height: e.height
+    };
+    const i = parseFloat(t.getAttribute(&quot;width&quot;) ?? &quot;&quot;), r = parseFloat(t.getAttribute(&quot;height&quot;) ?? &quot;&quot;);
+    return isFinite(i) &amp;amp;&amp;amp; isFinite(r) &amp;amp;&amp;amp; i &amp;gt; 0 &amp;amp;&amp;amp; r &amp;gt; 0 ? {
+      x: 0,
+      y: 0,
+      width: i,
+      height: r
+    } : {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0
+    };
+  }
+  updateCoordinateCallout(t, e, i) {
+    const { label: r, labelBackground: n, labelOutline: s, labelAccent: o, labelLeader: c } = t;
+    if (!r || !n || !s || !o || !c) return;
+    const l = this.getSvgBounds(i), u = 20, a = 8, m = 6, p = 4;
+    let g = 1, b = -1;
+    const f = parseFloat(r.getAttribute(&quot;x&quot;) ?? &quot;&quot;), A = parseFloat(r.getAttribute(&quot;y&quot;) ?? &quot;&quot;);
+    let d;
+    try {
+      d = r.getBBox();
+    } catch {
+      d = {
+        x: f,
+        y: A - 11,
+        width: (r.textContent ?? &quot;&quot;).length * 7,
+        height: 14
+      };
+    }
+    const w = d.x - f, v = d.y - A, h = d.width + 2 * m, S = d.height + 2 * p;
+    l.width &amp;gt; 0 &amp;amp;&amp;amp; e.x + u + h &amp;gt; l.x + l.width &amp;amp;&amp;amp; (g = -1), l.height &amp;gt; 0 &amp;amp;&amp;amp; e.y - S &amp;lt; l.y &amp;amp;&amp;amp; (b = 1);
+    let y = g &amp;gt; 0 ? e.x + u : e.x - u - h, x = b &amp;lt; 0 ? e.y - S : e.y + a;
+    l.width &amp;gt; 0 &amp;amp;&amp;amp; (y = this.clamp(y, l.x, l.x + l.width - h)), l.height &amp;gt; 0 &amp;amp;&amp;amp; (x = this.clamp(x, l.y, l.y + l.height - S)), r.setAttribute(&quot;x&quot;, String(y + m - w)), r.setAttribute(&quot;y&quot;, String(x + p - v)), n.setAttribute(&quot;x&quot;, String(y)), n.setAttribute(&quot;y&quot;, String(x)), n.setAttribute(&quot;width&quot;, String(h)), n.setAttribute(&quot;height&quot;, String(S)), s.setAttribute(&quot;x&quot;, String(y)), s.setAttribute(&quot;y&quot;, String(x)), s.setAttribute(&quot;width&quot;, String(h)), s.setAttribute(&quot;height&quot;, String(S)), o.setAttribute(&quot;x1&quot;, String(y)), o.setAttribute(&quot;x2&quot;, String(y + h)), o.setAttribute(&quot;y1&quot;, String(x)), o.setAttribute(&quot;y2&quot;, String(x));
+    const M = e.x + g * 4, O = e.y, C = g &amp;gt; 0 ? y : y + h, F = C - g * 5, k = x + (b &amp;lt; 0 ? 0.62 : 0.38) * S;
+    c.setAttribute(&quot;points&quot;, `${M},${O} ${F},${k} ${C},${k}`);
+  }
+  initializeCoordinateTool(t) {
+    const e = t.getElementsByClassName(&quot;wgx-curve&quot;);
+    if (e.length === 0) return;
+    const i = parseFloat(t.getAttribute(&quot;data-mapax&quot;) ?? &quot;&quot;), r = parseFloat(t.getAttribute(&quot;data-mapbx&quot;) ?? &quot;&quot;), n = parseFloat(t.getAttribute(&quot;data-mapay&quot;) ?? &quot;&quot;), s = parseFloat(t.getAttribute(&quot;data-mapby&quot;) ?? &quot;&quot;), o = {
+      marker: null,
+      labelLeader: null,
+      labelBackground: null,
+      labelOutline: null,
+      labelAccent: null,
+      label: null
+    }, c = (l) =&amp;gt; {
+      const u = this.eventToPoint(t, l);
+      let a = null, m = null;
+      this.ensureCoordinateReadout(t, o);
+      for (const v of e) {
+        const h = this.nearestPointOnCurve(t, v, u);
+        h !== null &amp;amp;&amp;amp; (a === null || h.distanceSquared &amp;lt; a.distanceSquared) &amp;amp;&amp;amp; (a = h, m = v);
+      }
+      if (a === null || m === null) {
+        this.hideCoordinateReadout(o);
+        return;
+      }
+      const { marker: p, labelLeader: g, labelBackground: b, labelOutline: f, labelAccent: A, label: d } = o;
+      if (!p || !g || !b || !f || !A || !d) return;
+      const w = this.getCurveStrokeColor(m);
+      p.setAttribute(&quot;cx&quot;, String(a.x)), p.setAttribute(&quot;cy&quot;, String(a.y)), p.setAttribute(&quot;fill&quot;, w), g.setAttribute(&quot;stroke&quot;, w), f.setAttribute(&quot;stroke&quot;, w), g.style.display = &quot;inline&quot;, b.style.display = &quot;inline&quot;, f.style.display = &quot;inline&quot;, A.style.display = &quot;inline&quot;, d.textContent = `${((a.localX - r) / i).toFixed(2)}, ${((a.localY - s) / n).toFixed(2)}`, d.setAttribute(&quot;x&quot;, String(a.x + 26)), d.setAttribute(&quot;y&quot;, String(a.y - 7)), d.style.display = &quot;inline&quot;, this.updateCoordinateCallout(o, a, t), t.appendChild(g), t.appendChild(b), t.appendChild(f), t.appendChild(A), t.appendChild(d), p.style.display = &quot;inline&quot;, t.appendChild(p);
+    };
+    t.addEventListener(&quot;mousemove&quot;, c), t.addEventListener(&quot;mouseleave&quot;, () =&amp;gt; {
+      this.hideCoordinateReadout(o);
+    });
+  }
+};
+function E() {
+  const T = new L(document);
+  T.populate();
+  for (const t of T.elements) T.initializeCoordinateTool(t);
+}
+document.readyState === &quot;loading&quot; ? document.addEventListener(&quot;DOMContentLoaded&quot;, E, { once: !0 }) : E();&lt;/script&gt;
+ &lt;text id=&apos;wgx-status&apos;
+     class=&apos;wgx-status&apos;
+     x=&apos;7.2&apos;
+     y=&apos;348.6428&apos;
+     font-size=&apos;13.3333&apos; /&gt;
+ &lt;g&gt;
+  &lt;circle cx=&apos;179.5&apos;
+      cy=&apos;179.2128&apos;
+      r=&apos;172.3200&apos;
+      data-wgx-tooltip-id=&apos;tip-78468d5c-af31-4b30-9f79-e375c698dbf4&apos; /&gt;
+  &lt;g id=&apos;tip-78468d5c-af31-4b30-9f79-e375c698dbf4&apos;
+      class=&apos;wgx-tip&apos;
+      display=&apos;none&apos;&gt;
+   &lt;rect class=&apos;wgx-tip-bg&apos;
+       x=&apos;13.3333&apos;
+       y=&apos;0&apos;
+       width=&apos;30.9334&apos;
+       height=&apos;30.9334&apos;
+       rx=&apos;4&apos; /&gt;
+   &lt;text x=&apos;20&apos; y=&apos;18.1067&apos; fill=&apos;#666666&apos; font-size=&apos;14.6667&apos;&gt;hi&lt;/text&gt;
+  &lt;/g&gt;
+ &lt;/g&gt;
+&lt;/svg&gt;</String>
+</Expression>
